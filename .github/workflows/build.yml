@@ -26,9 +26,9 @@ jobs:
     - name: Decode debug keystore
       run: |
         if [ -f debug.keystore.base64 ]; then
-          base64 -d debug.keystore.base64 > debug.keystore
+          base64 -d debug.keystore.base64 > debug.keystore || openssl base64 -d -A -in debug.keystore.base64 -out debug.keystore
         elif [ -f app/debug.keystore.base64 ]; then
-          base64 -d app/debug.keystore.base64 > debug.keystore
+          base64 -d app/debug.keystore.base64 > debug.keystore || openssl base64 -d -A -in app/debug.keystore.base64 -out debug.keystore
         fi
 
     - name: Create .env file
@@ -38,6 +38,9 @@ jobs:
         else
           echo "NO_KEYS=" > .env
         fi
+
+    - name: Fix line endings in gradlew
+      run: sed -i 's/\r$//' gradlew
 
     - name: Make gradlew executable
       run: chmod +x gradlew
