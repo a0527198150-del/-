@@ -21,6 +21,8 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.7' # זה גורם לשרת להשתמש בגרסה נקייה משלו במקום בקובץ הפגום!
 
     - name: Decode debug keystore
       run: |
@@ -43,22 +45,9 @@ jobs:
           echo "NO_KEYS=" > .env
         fi
 
-    - name: Fix line endings in gradlew
-      run: sed -i 's/\r$//' gradlew
-
-    - name: Make gradlew executable
-      run: chmod +x gradlew
-
-    - name: Force Download Fresh Gradle Wrapper Jar
-      run: |
-        mkdir -p gradle/wrapper
-        mkdir -p app/gradle/wrapper
-        curl -Lo gradle/wrapper/gradle-wrapper.jar https://services.gradle.org/distributions/gradle-8.7-wrapper.jar.sha256
-        cp gradle/wrapper/gradle-wrapper.jar app/gradle/wrapper/gradle-wrapper.jar || true
-
     - name: Build with Gradle
-      run: ./gradlew assembleDebug
-
+      run: gradle assembleDebug # משתמשים ישירות בפקודת השרת הנקייה
+      
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
