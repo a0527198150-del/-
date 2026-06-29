@@ -1,0 +1,6 @@
+{
+  "name": "Filtered Channels",
+  "description": "אפליקציה כשרה לצפייה בערוצי יוטיוב נבחרים ומאושרים בלבד, עם מצב מפקח מאובטח בקוד.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
