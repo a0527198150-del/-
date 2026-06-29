@@ -1,6 +1,6 @@
 name: Build Android APK
 
-on:
+on:`n  workflow_dispatch:
   push:
     branches: [ "main", "master" ]
   pull_request:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on:`n  workflow_dispatch: ubuntu-latest
 
     steps:
     - name: Checkout code
@@ -17,8 +17,8 @@ jobs:
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
-        java-version: '21'
-        distribution: 'temurin'
+        java-version:`n  workflow_dispatch: '21'
+        distribution:`n  workflow_dispatch: 'temurin'
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
