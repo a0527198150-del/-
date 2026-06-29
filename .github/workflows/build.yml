@@ -49,9 +49,12 @@ jobs:
     - name: Make gradlew executable
       run: chmod +x gradlew
 
-    - name: Fix Corrupted Gradle Wrapper Jar
+    - name: Force Download Fresh Gradle Wrapper Jar
       run: |
-        curl -Lo gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.7/gradle/wrapper/gradle-wrapper.jar
+        mkdir -p gradle/wrapper
+        mkdir -p app/gradle/wrapper
+        curl -Lo gradle/wrapper/gradle-wrapper.jar https://services.gradle.org/distributions/gradle-8.7-wrapper.jar.sha256
+        cp gradle/wrapper/gradle-wrapper.jar app/gradle/wrapper/gradle-wrapper.jar || true
 
     - name: Build with Gradle
       run: ./gradlew assembleDebug
