@@ -1,5 +1,6 @@
+name: Build Android APK
+
 on:
-  workflow_dispatch:
   push:
     branches: [ "main", "master" ]
   pull_request:
@@ -21,8 +22,6 @@ jobs:
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '9.3.1'
 
     - name: Decode debug keystore
       run: |
@@ -31,7 +30,7 @@ jobs:
         elif [ -f app/debug.keystore.base64 ]; then
           tr -d '\n\r' < app/debug.keystore.base64 | base64 -d > debug.keystore
         fi
-
+        
         if [ ! -s debug.keystore ]; then
           echo "Debug keystore not found or invalid, generating a new one..."
           keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
@@ -45,11 +44,17 @@ jobs:
           echo "NO_KEYS=" > .env
         fi
 
+    - name: Fix line endings in gradlew
+      run: sed -i 's/\r$//' gradlew
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
     - name: Build with Gradle
-      run: gradle assembleDebug
-      
+      run: ./gradlew assembleDebug
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: kosher-filter-apk
-        path: "**/build/outputs/apk/**/*.apk"
+        path: app/build/outputs/apk/debug/app-debug.apk

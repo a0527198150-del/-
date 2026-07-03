@@ -1,6 +1,12 @@
 package com.example.ui.screens
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -48,15 +54,20 @@ import coil.compose.AsyncImage
 import com.example.data.database.ApprovedChannel
 import com.example.data.network.YoutubeVideo
 
-// Colors for our elegant "Professional Polish - סינון קודש" Theme
-val ScreenBg = Color(0xFFF3F4F9)       // Professional Light gray-blue
-val CardBg = Color(0xFFFFFFFF)         // White
-val RoyalBlue = Color(0xFF001452)      // Deep Primary dark blue
-val LightBlue = Color(0xFFDDE1FF)      // Warm blue highlight
-val LightBlueBorder = Color(0xFFBBC3FF) // Border color for highlights
-val DarkText = Color(0xFF1B1B1F)       // Active text / dark accent
-val MutedText = Color(0xFF44474E)      // Slate gray secondary text/icons
-val BorderColor = Color(0xFFE1E2EC)    // Standard border color
+// Colors for our elegant "Professional Polish - ערוצים כשרים" Theme
+val ScreenBg = Color(0xFF0D0E15)        // Ultra-sleek dark space background
+val CardBg = Color(0xFF161824)          // Elegant high-contrast slate-blue card surface
+val RoyalBlue = Color(0xFF4F46E5)       // Modern Indigo Primary
+val LightBlue = Color(0xFF1E1E30)       // Dark slate highlight
+val LightBlueBorder = Color(0xFF2E2E48) // Custom outline for highlights
+val DarkText = Color(0xFFF1F5F9)        // Bright white-slate text for high readability
+val MutedText = Color(0xFF94A3B8)       // Cool slate secondary text
+val BorderColor = Color(0xFF232536)     // Sleek subtle border
+
+// Gold Accent colors for professional kosher badges and headers
+val GoldColor = Color(0xFFFBBF24)       // Vibrant Gold for Kosher/Security labels
+val GoldBg = Color(0xFF232015)          // Warm dark background for golden labels
+val GoldBorder = Color(0xFF42371E)      // Gold border
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,9 +105,9 @@ fun MainScreen(
         }
     }
 
-    // Material 3 Custom Theme Wrapper (Light Theme to match Professional Polish)
+    // Material 3 Custom Theme Wrapper (Dark Theme for a cool, premium aesthetic)
     MaterialTheme(
-        colorScheme = lightColorScheme(
+        colorScheme = darkColorScheme(
             primary = RoyalBlue,
             onPrimary = Color.White,
             secondary = LightBlue,
@@ -124,14 +135,14 @@ fun MainScreen(
                                 Icon(
                                     imageVector = Icons.Filled.Shield, 
                                     contentDescription = "סינון",
-                                    tint = RoyalBlue,
+                                    tint = GoldColor,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                             Column {
                                 Text(
                                     text = when (screenState) {
-                                        ScreenState.CHANNELS -> "סינון קודש"
+                                        ScreenState.CHANNELS -> "ערוצים כשרים"
                                         ScreenState.CHANNEL_VIDEOS -> selectedChannel?.customName ?: "סרטונים מאושרים"
                                         ScreenState.PLAYER -> selectedVideo?.title ?: "נגן כשר"
                                         ScreenState.SUPERVISOR -> "מצב מפקח - ניהול סינון"
@@ -170,7 +181,7 @@ fun MainScreen(
                             Icon(
                                 imageVector = if (isSupervisor) Icons.Filled.LockOpen else Icons.Filled.Lock,
                                 contentDescription = if (isSupervisor) "מצב מפקח פעיל" else "כניסה למצב מפקח",
-                                tint = if (isSupervisor) RoyalBlue else MutedText
+                                tint = if (isSupervisor) GoldColor else MutedText
                             )
                         }
                         
@@ -252,61 +263,91 @@ fun ChannelsGridScreen(
     onChannelClick: (ApprovedChannel) -> Unit,
     onEnterSupervisorClick: () -> Unit
 ) {
+    var isBannerDismissed by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Kosher Header Card in LightBlue
-        Card(
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = LightBlue),
-            border = BorderStroke(1.dp, LightBlueBorder),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(18.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+        // Kosher Header Card with modern Gold-themed colors
+        if (!isBannerDismissed) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = GoldBg),
+                border = BorderStroke(1.5.dp, GoldBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp)
             ) {
-                Text(
-                    text = "הלימוד היומי שלך בסינון קודש",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = RoyalBlue,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "הגישה באפליקציה זו מוגבלת אך ורק לערוצי התורה והחיזוק שאושרו בפיקוח. שאר התכנים ברשת חסומים בצורה מוחלטת.",
-                    fontSize = 13.sp,
-                    color = RoyalBlue.copy(alpha = 0.85f),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 18.sp
-                )
-                
-                if (!isSupervisorMode) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "לשינוי או הוספת ערוצים, פנה למשגיח או לחץ על סמל המנעול למעלה.",
-                        fontSize = 12.sp,
-                        color = RoyalBlue.copy(alpha = 0.7f),
+                        text = "הלימוד היומי שלך בערוצים כשרים",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        color = GoldColor,
                         textAlign = TextAlign.Center
                     )
-                } else {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(RoyalBlue.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "הגישה באפליקציה זו מוגבלת אך ורק לערוצי התורה והחיזוק שאושרו בפיקוח. שאר התכנים ברשת חסומים בצורה מוחלטת.",
+                        fontSize = 13.sp,
+                        color = DarkText.copy(alpha = 0.9f),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+                    
+                    if (!isSupervisorMode) {
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "מצב מפקח פעיל! באפשרותך להוסיף ולמחוק ערוצים כעת.",
+                            text = "לשינוי או הוספת ערוצים, פנה למשגיח או לחץ על סמל המנעול למעלה.",
                             fontSize = 12.sp,
-                            color = RoyalBlue,
-                            fontWeight = FontWeight.Bold
+                            color = MutedText,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(RoyalBlue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .border(1.dp, RoyalBlue, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "מצב מפקח פעיל! באפשרותך להוסיף ולמחוק ערוצים כעת.",
+                                fontSize = 12.sp,
+                                color = DarkText,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    
+                    Button(
+                        onClick = { isBannerDismissed = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .testTag("dismiss_banner_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "הבנתי, המשך לערוצים",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
                     }
                 }
@@ -386,9 +427,9 @@ fun ChannelGridItem(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = CardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         border = BorderStroke(1.dp, BorderColor),
         modifier = Modifier
             .fillMaxWidth()
@@ -397,24 +438,24 @@ fun ChannelGridItem(
     ) {
         Column(
             modifier = Modifier
-                .padding(14.dp)
+                .padding(16.dp)
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Elegant circle with channel initial letter (school/study theme)
             Box(
                 modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color(0xFFF1F0F4))
-                    .border(1.dp, BorderColor, RoundedCornerShape(28.dp)),
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(LightBlue)
+                    .border(1.dp, BorderColor, RoundedCornerShape(30.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = channel.customName.take(1),
-                    fontSize = 22.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = RoyalBlue
+                    color = GoldColor
                 )
             }
             
@@ -443,13 +484,14 @@ fun ChannelGridItem(
                 modifier = Modifier.height(28.dp)
             )
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(LightBlue.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
-                    .padding(vertical = 6.dp),
+                    .background(RoyalBlue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                    .border(1.dp, RoyalBlue.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -481,6 +523,23 @@ fun ChannelVideosScreen(
     onBackClick: () -> Unit,
     onVideoClick: (YoutubeVideo) -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredVideos = remember(videosState, searchQuery) {
+        if (videosState is VideosUiState.Success) {
+            if (searchQuery.isBlank()) {
+                videosState.videos
+            } else {
+                videosState.videos.filter {
+                    it.title.contains(searchQuery, ignoreCase = true) ||
+                    it.description.contains(searchQuery, ignoreCase = true)
+                }
+            }
+        } else {
+            emptyList()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -528,10 +587,10 @@ fun ChannelVideosScreen(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(LightBlue.copy(alpha = 0.5f)),
+                        .background(LightBlue),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(channel.customName.take(1), color = RoyalBlue, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(channel.customName.take(1), color = GoldColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
@@ -540,6 +599,47 @@ fun ChannelVideosScreen(
                 }
             }
         }
+
+        // Search Field
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("חפש שיעור או נושא בערוץ...", color = MutedText, fontSize = 13.sp) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "חיפוש",
+                    tint = MutedText,
+                    modifier = Modifier.size(20.dp)
+                )
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "נקה",
+                            tint = MutedText,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            },
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = RoyalBlue,
+                unfocusedBorderColor = BorderColor,
+                focusedContainerColor = LightBlue,
+                unfocusedContainerColor = LightBlue,
+                focusedTextColor = DarkText,
+                unfocusedTextColor = DarkText
+            ),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+                .testTag("channel_video_search_input")
+        )
 
         // Live Feed Videos List
         when (videosState) {
@@ -587,15 +687,35 @@ fun ChannelVideosScreen(
             }
             
             is VideosUiState.Success -> {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    items(videosState.videos) { video ->
-                        VideoListItem(
-                            video = video,
-                            onClick = { onVideoClick(video) }
-                        )
+                if (filteredVideos.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Filled.SearchOff,
+                                contentDescription = "אין תוצאות",
+                                tint = MutedText,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("לא נמצאו שיעורים המתאימים לחיפוש שלך", color = MutedText, fontSize = 14.sp)
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(filteredVideos) { video ->
+                            VideoListItem(
+                                video = video,
+                                onClick = { onVideoClick(video) }
+                            )
+                        }
                     }
                 }
             }
@@ -768,8 +888,8 @@ fun VideoPlayerScreen(
         Card(
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.Black),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-            border = BorderStroke(1.dp, BorderColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            border = BorderStroke(1.5.dp, BorderColor),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
@@ -782,11 +902,12 @@ fun VideoPlayerScreen(
         
         Spacer(modifier = Modifier.height(12.dp))
         
-        // Safety lock assurance footer
+        // Safety lock assurance footer in beautiful Gold
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(LightBlue.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .background(GoldBg, RoundedCornerShape(8.dp))
+                .border(1.dp, GoldBorder, RoundedCornerShape(8.dp))
                 .padding(10.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
@@ -794,14 +915,14 @@ fun VideoPlayerScreen(
             Icon(
                 imageVector = Icons.Outlined.VerifiedUser,
                 contentDescription = "סינון מאובטח",
-                tint = RoyalBlue,
+                tint = GoldColor,
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = "נגן מסונן פעיל: מנוע החיפוש הכללי, התגובות, והמלצות הוידאו חסומים לחלוטין.",
                 fontSize = 11.sp,
-                color = RoyalBlue,
+                color = GoldColor,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Medium
             )
@@ -809,46 +930,149 @@ fun VideoPlayerScreen(
     }
 }
 
+private fun Context.findActivity(): Activity? {
+    var context = this
+    while (context is ContextWrapper) {
+        if (context is Activity) return context
+        context = context.baseContext
+    }
+    return null
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
-    AndroidView(
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = true
-                settings.mediaPlaybackRequiresUserGesture = false
-                settings.domStorageEnabled = true
-                settings.loadWithOverviewMode = true
-                settings.useWideViewPort = true
-                
-                webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(
-                        view: WebView?,
-                        request: WebResourceRequest?
-                    ): Boolean {
-                        val url = request?.url?.toString() ?: ""
-                        // Strictly lock down WebView navigation to the embed iframe address only
-                        return if (url.contains("youtube.com/embed/") || url.contains("youtube-nocookie.com/embed/")) {
-                            false // Load embed
-                        } else {
-                            true // Block other navigations (like links inside the video or ads)
-                        }
-                    }
-                }
-                
-                // Load embed utilizing youtube-nocookie for privacy and tighter kosher constraints
-                val embedUrl = "https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&controls=1&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=0"
-                loadUrl(embedUrl)
-            }
-        },
-        modifier = modifier,
-        update = { webView ->
-            val embedUrl = "https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&controls=1&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=0"
-            if (webView.url != embedUrl) {
-                webView.loadUrl(embedUrl)
+    var isFullScreen by remember { mutableStateOf(false) }
+    var customViewRef by remember { mutableStateOf<View?>(null) }
+    var customCallbackRef by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+
+    val context = LocalContext.current
+
+    if (isFullScreen) {
+        BackHandler {
+            val activity = context.findActivity()
+            val customViewLocal = customViewRef
+            if (activity != null && customViewLocal != null) {
+                (activity.window.decorView as ViewGroup).removeView(customViewLocal)
+                customViewRef = null
+                customCallbackRef?.onCustomViewHidden()
+                customCallbackRef = null
+                activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                isFullScreen = false
             }
         }
-    )
+    }
+
+    key(videoId) {
+        AndroidView(
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    settings.javaScriptEnabled = true
+                    settings.mediaPlaybackRequiresUserGesture = false
+                    settings.domStorageEnabled = true
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.databaseEnabled = true
+                    settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val url = request?.url?.toString() ?: ""
+                            val isMainFrame = request?.isForMainFrame ?: false
+                            if (isMainFrame) {
+                                return if (url.contains("youtube.com/embed/") || url.contains("youtube-nocookie.com/embed/")) {
+                                    false
+                                } else {
+                                    true
+                                }
+                            }
+                            return false
+                        }
+                    }
+
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                            super.onShowCustomView(view, callback)
+                            val activity = ctx.findActivity() ?: return
+                            if (customViewRef != null) {
+                                callback?.onCustomViewHidden()
+                                return
+                            }
+                            customViewRef = view
+                            customCallbackRef = callback
+                            isFullScreen = true
+                            
+                            activity.window.decorView.systemUiVisibility = (
+                                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            )
+                            
+                            (activity.window.decorView as ViewGroup).addView(
+                                view,
+                                ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                            )
+                        }
+
+                        override fun onHideCustomView() {
+                            super.onHideCustomView()
+                            val activity = ctx.findActivity() ?: return
+                            val customViewLocal = customViewRef ?: return
+                            
+                            (activity.window.decorView as ViewGroup).removeView(customViewLocal)
+                            customViewRef = null
+                            customCallbackRef?.onCustomViewHidden()
+                            customCallbackRef = null
+                            isFullScreen = false
+                            
+                            activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                        }
+                    }
+                    
+                    val html = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                            <style>
+                                body, html {
+                                    margin: 0;
+                                    padding: 0;
+                                    width: 100%;
+                                    height: 100%;
+                                    background-color: #0A0B10;
+                                    overflow: hidden;
+                                }
+                                iframe {
+                                    width: 100%;
+                                    height: 100%;
+                                    border: none;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <iframe 
+                                id="player"
+                                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&showinfo=0&iv_load_policy=3&disablekb=0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen>
+                            </iframe>
+                        </body>
+                        </html>
+                    """.trimIndent()
+                    
+                    loadDataWithBaseURL("https://www.youtube-nocookie.com", html, "text/html", "UTF-8", null)
+                }
+            },
+            modifier = modifier
+        )
+    }
 }
 
 // ==========================================
