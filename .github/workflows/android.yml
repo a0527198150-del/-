@@ -21,7 +21,7 @@ jobs:
         distribution: 'temurin'
 
     - name: Build with Gradle
-      run: gradle assembleDebug --stacktrace
+      run: gradle assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m -Djava.awt.headless=true"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
