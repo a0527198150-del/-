@@ -20,8 +20,13 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    - name: Repair Gradle Wrapper
+      run: gradle wrapper
+
     - name: Build with Gradle
-      run: gradle assembleDebug --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m -Djava.awt.headless=true"
+      run: ./gradlew assembleDebug --stacktrace
+      env:
+        JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
