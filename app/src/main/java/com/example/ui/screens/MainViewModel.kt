@@ -153,31 +153,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val description = inputDescription.value.trim()
 
         if (rawId.isEmpty()) {
-            _statusMessage.value = "שגיאה: יש להזין מזהה ערוץ"
-            return
-        }
-
-        // Clean raw link to channel ID if they pasted a link
-        val channelId = if (rawId.contains("youtube.com")) {
-            val extracted = com.example.data.network.YoutubeRssService.extractChannelId(rawId)
-            if (extracted == null) {
-                _statusMessage.value = "שגיאה: לא הצלחנו לחלץ מזהה ערוץ תקני מתוך הקישור. אנא הזן מזהה ערוץ המתחיל ב-UC (למשל UC...)"
-                return
-            }
-            extracted
-        } else {
-            rawId
-        }
-
-        if (!channelId.startsWith("UC") || channelId.length != 24) {
-            _statusMessage.value = "מזהה לא תקין. מזהה ערוץ יוטיוב חייב להתחיל ב-UC ולהיות באורך 24 תווים."
+            _statusMessage.value = "שגיאה: יש להזין מזהה, קישור או שם משתמש של ערוץ"
             return
         }
 
         viewModelScope.launch {
             try {
-                _statusMessage.value = "מזהה ערוץ תקין. מוודא נתונים מיוטיוב..."
-                val testVideos = repository.fetchChannelVideos(channelId)
+                _statusMessage.value = "מפענח את מזהה הערוץ מיוטיוב... אנא המתן."
+                val resolvedChannelId = repository.resolveChannelId(rawId)
+
+                if (resolvedChannelId == null) {
+                    _statusMessage.value = "שגיאה: לא הצלחנו לפענח מזהה ערוץ תקני מתוך הקלט. אנא ודא שהקישור/שם המשתמש נכונים או הזן מזהה ערוץ ישיר (המתחיל ב-UC)."
+                    return@launch
+                }
+
+                _statusMessage.value = "הערוץ פוענח בהצלחה (ID: $resolvedChannelId). מוודא נתונים מיוטיוב..."
+                val testVideos = repository.fetchChannelVideos(resolvedChannelId)
                 val officialName = if (testVideos.isNotEmpty()) {
                     testVideos[0].channelName
                 } else {
@@ -185,7 +176,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 repository.addChannel(
-                    channelId = channelId,
+                    channelId = resolvedChannelId,
                     customName = customName.ifBlank { officialName },
                     officialName = officialName,
                     description = description.ifBlank { "ערוץ שנבחר ומאושר לצפייה מסוננת." }

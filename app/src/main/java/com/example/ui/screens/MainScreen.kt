@@ -1139,7 +1139,7 @@ fun SupervisorPanelScreen(
                     }
                     
                     Text(
-                        text = "ניתן להוסיף ערוץ על ידי הזנת מזהה ערוץ יוטיוב תקני (מתחיל ב-UC באורך 24 תווים) או הדבקת קישור לעמוד הערוץ.",
+                        text = "ניתן להוסיף ערוץ בקלות! פשוט הדבק קישור לערוץ, רשום את שם המשתמש/הכינוי (למשל @Hidabroot_LTD) או הזן מזהה ערוץ ישיר (המתחיל ב-UC). האפליקציה תפענח ותמצא את הערוץ בצורה אוטומטית.",
                         fontSize = 12.sp,
                         color = MutedText,
                         lineHeight = 16.sp
@@ -1148,8 +1148,8 @@ fun SupervisorPanelScreen(
                     OutlinedTextField(
                         value = channelIdInput,
                         onValueChange = { viewModel.inputChannelId.value = it },
-                        label = { Text("מזהה ערוץ (Channel ID) או קישור") },
-                        placeholder = { Text("למשל UC3_xO72KOfxof...", color = MutedText) },
+                        label = { Text("קישור לערוץ, שם משתמש (@) או מזהה ערוץ") },
+                        placeholder = { Text("למשל @Hidabroot_LTD או קישור לערוץ...", color = MutedText) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = RoyalBlue,

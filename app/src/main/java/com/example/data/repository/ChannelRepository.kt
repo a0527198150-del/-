@@ -49,6 +49,10 @@ class ChannelRepository(
         return rssService.fetchChannelVideos(channelId)
     }
 
+    suspend fun resolveChannelId(input: String): String? {
+        return rssService.resolveChannelId(input)
+    }
+
     // Seeds beautiful default Torah channels if the database is empty
     suspend fun seedDefaultChannelsIfEmpty() {
         val currentList = approvedChannels.first()

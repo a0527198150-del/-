@@ -28,6 +28,71 @@ class YoutubeRssService {
         }
     }
 
+    suspend fun resolveChannelId(input: String): String? = withContext(Dispatchers.IO) {
+        val trimmed = input.trim()
+
+        // 1. If it's already a UC ID
+        if (trimmed.startsWith("UC") && trimmed.length == 24) {
+            return@withContext trimmed
+        }
+
+        // 2. If it's a channel URL with UC ID in it
+        val channelIdPattern = Regex("youtube\\.com/channel/(UC[a-zA-Z0-9_-]{22})")
+        val match = channelIdPattern.find(trimmed)
+        if (match != null) {
+            return@withContext match.groupValues[1]
+        }
+
+        // 3. Reconstruct the full YouTube URL
+        val targetUrl = when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.startsWith("@") -> "https://www.youtube.com/$trimmed"
+            else -> "https://www.youtube.com/@$trimmed"
+        }
+
+        val request = Request.Builder()
+            .url(targetUrl)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+            .build()
+
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val html = response.body?.string() ?: ""
+
+                // A. itemprop="channelId" content="UC..."
+                val itempropRegex = Regex("itemprop=\"channelId\"\\s+content=\"(UC[a-zA-Z0-9_-]{22})\"")
+                itempropRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                val itempropRegex2 = Regex("content=\"(UC[a-zA-Z0-9_-]{22})\"\\s+itemprop=\"channelId\"")
+                itempropRegex2.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                // B. canonical link: href="https://www.youtube.com/channel/UC..."
+                val canonicalRegex = Regex("<link\\s+rel=\"canonical\"\\s+href=\"https://www.youtube.com/channel/(UC[a-zA-Z0-9_-]{22})\"")
+                canonicalRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                // C. browseId or channelId in JSON structures
+                val browseIdRegex = Regex("\"browseId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                browseIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                val jsonChannelIdRegex = Regex("\"channelId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                jsonChannelIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                val externalIdRegex = Regex("\"externalId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                externalIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                // D. General fallback for any channel link inside the page
+                val generalChannelUrlRegex = Regex("/channel/(UC[a-zA-Z0-9_-]{22})")
+                generalChannelUrlRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return@withContext null
+    }
+
     companion object {
         // Safe channel ID parsing
         fun extractChannelId(input: String): String? {
