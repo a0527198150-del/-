@@ -484,103 +484,69 @@ fun ChannelVideosScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(12.dp)
     ) {
-        // Back Navigation Bar
+        // Space-saving compact Side-by-Side Back Button + Search Bar Row
         Row(
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
         ) {
-            Button(
+            IconButton(
                 onClick = onBackClick,
-                colors = ButtonDefaults.buttonColors(containerColor = CardBg),
-                border = BorderStroke(1.dp, BorderColor),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                modifier = Modifier.testTag("back_to_channels_button")
+                modifier = Modifier
+                    .background(CardBg, RoundedCornerShape(12.dp))
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .testTag("back_to_channels_button")
             ) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack, 
                     contentDescription = "חזרה",
-                    tint = RoyalBlue,
-                    modifier = Modifier.size(18.dp)
+                    tint = RoyalBlue
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("לרשימת הערוצים", color = RoyalBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
-        }
-
-        // Selected Channel Detail Title Card
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(LightBlue),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(channel.customName.take(1), color = GoldColor, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(channel.customName, fontWeight = FontWeight.Bold, color = DarkText, fontSize = 15.sp)
-                    Text("מזהה ערוץ: ${channel.channelId}", fontSize = 10.sp, color = MutedText)
-                }
-            }
-        }
-
-        // Search Field
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("חפש שיעור או נושא בערוץ...", color = MutedText, fontSize = 13.sp) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "חיפוש",
-                    tint = MutedText,
-                    modifier = Modifier.size(20.dp)
-                )
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "נקה",
-                            tint = MutedText,
-                            modifier = Modifier.size(20.dp)
-                        )
+            
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("חפש שיעור בערוץ...", color = MutedText, fontSize = 13.sp) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Filled.Search,
+                        contentDescription = "חיפוש",
+                        tint = MutedText,
+                        modifier = Modifier.size(18.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "נקה",
+                                tint = MutedText,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
-                }
-            },
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = RoyalBlue,
-                unfocusedBorderColor = BorderColor,
-                focusedContainerColor = LightBlue,
-                unfocusedContainerColor = LightBlue,
-                focusedTextColor = DarkText,
-                unfocusedTextColor = DarkText
-            ),
-            shape = RoundedCornerShape(14.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .testTag("channel_video_search_input")
-        )
+                },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = RoyalBlue,
+                    unfocusedBorderColor = BorderColor,
+                    focusedContainerColor = LightBlue,
+                    unfocusedContainerColor = LightBlue,
+                    focusedTextColor = DarkText,
+                    unfocusedTextColor = DarkText
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("channel_video_search_input")
+            )
+        }
 
         // Live Feed Videos List
         when (videosState) {
@@ -772,21 +738,112 @@ fun VideoPlayerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .background(ScreenBg)
     ) {
-        // Back Control Row
-        Row(
+        // Immersive full-bleed 16:9 Video Player at the top
+        // Rendered flat directly without a clipping rounded Card to prevent the black screen composition bug!
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .aspectRatio(16f / 9f)
+                .background(Color.Black)
         ) {
+            KosherVideoPlayer(
+                videoId = video.id,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        // Details & controls column underneath
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Elegant title and channel row
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = video.title,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = DarkText,
+                        lineHeight = 21.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(22.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(LightBlue),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = video.channelName.take(1),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GoldColor
+                            )
+                        }
+                        Text(
+                            text = "ערוץ: ${video.channelName} • צפייה כשרה ומסוננת",
+                            fontSize = 11.sp,
+                            color = MutedText,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // Description card
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "על השיעור",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = DarkText
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = video.description.ifBlank { "שיעור תורה מאושר ומסונן היטב לצפייה מוגנת ובטוחה." },
+                        fontSize = 12.sp,
+                        color = MutedText,
+                        lineHeight = 17.sp,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // Control Button: Back to list of videos
             Button(
                 onClick = onBackClick,
                 colors = ButtonDefaults.buttonColors(containerColor = CardBg),
                 border = BorderStroke(1.dp, BorderColor),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                modifier = Modifier.testTag("back_to_videos_button")
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("back_to_videos_button")
             ) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack, 
@@ -797,76 +854,34 @@ fun VideoPlayerScreen(
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("חזרה לרשימת השיעורים", color = RoyalBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
-        }
 
-        // Title and Video metadata Card
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = CardBg),
-            border = BorderStroke(1.dp, BorderColor),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Text(
-                    text = video.title,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = DarkText,
-                    lineHeight = 20.sp
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Safety badge footer
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(GoldBg, RoundedCornerShape(8.dp))
+                    .border(1.dp, GoldBorder, RoundedCornerShape(8.dp))
+                    .padding(8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.VerifiedUser,
+                    contentDescription = "סינון מאובטח",
+                    tint = GoldColor,
+                    modifier = Modifier.size(14.dp)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "ערוץ: ${video.channelName} • צפייה כשרה ללא הסחות דעת",
-                    fontSize = 11.sp,
-                    color = MutedText
+                    text = "נגן מסונן פעיל: מנוע החיפוש הכללי, התגובות, והמלצות הוידאו חסומים לחלוטין.",
+                    fontSize = 10.sp,
+                    color = GoldColor,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium
                 )
             }
-        }
-
-        // The sandboxed HTML player
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.Black),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            border = BorderStroke(1.5.dp, BorderColor),
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-            KosherVideoPlayer(
-                videoId = video.id,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(12.dp))
-        
-        // Safety lock assurance footer in beautiful Gold
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(GoldBg, RoundedCornerShape(8.dp))
-                .border(1.dp, GoldBorder, RoundedCornerShape(8.dp))
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.VerifiedUser,
-                contentDescription = "סינון מאובטח",
-                tint = GoldColor,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "נגן מסונן פעיל: מנוע החיפוש הכללי, התגובות, והמלצות הוידאו חסומים לחלוטין.",
-                fontSize = 11.sp,
-                color = GoldColor,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium
-            )
         }
     }
 }

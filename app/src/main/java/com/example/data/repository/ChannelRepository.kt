@@ -53,10 +53,20 @@ class ChannelRepository(
         return rssService.resolveChannelId(input)
     }
 
-    // Seeds beautiful default Torah channels if the database is empty
+    // Seeds beautiful default Torah channels if the database is empty or has obsolete placeholders
     suspend fun seedDefaultChannelsIfEmpty() {
         val currentList = approvedChannels.first()
-        if (currentList.isEmpty()) {
+        
+        // Clean up obsolete/broken placeholder IDs if present to ensure the user gets working feeds
+        val obsoleteIds = setOf("UC3_xO72KOfxofC8R8E9O0Zg", "UCG_T9M0b8MvY-K_7R-hQ0_w")
+        for (channel in currentList) {
+            if (channel.channelId in obsoleteIds) {
+                channelDao.deleteChannel(channel)
+            }
+        }
+
+        val updatedList = approvedChannels.first()
+        if (updatedList.isEmpty()) {
             // Seed a few highly-reputable Torah educational channels with verified IDs
             val defaults = listOf(
                 ApprovedChannel(

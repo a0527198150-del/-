@@ -13,7 +13,8 @@ class YoutubeRssService {
         val url = "https://www.youtube.com/feeds/videos.xml?channel_id=$channelId"
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
             .build()
 
         try {
@@ -85,6 +86,35 @@ class YoutubeRssService {
                 // D. General fallback for any channel link inside the page
                 val generalChannelUrlRegex = Regex("/channel/(UC[a-zA-Z0-9_-]{22})")
                 generalChannelUrlRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // 4. Fallback: Search YouTube with "channel" filters if it's a plain search query
+        try {
+            val encodedQuery = java.net.URLEncoder.encode(trimmed, "UTF-8")
+            // sp=EgIQAg%253D%253D triggers the "Channel" filter on YouTube search
+            val searchUrl = "https://www.youtube.com/results?search_query=$encodedQuery&sp=EgIQAg%253D%253D"
+            val searchRequest = Request.Builder()
+                .url(searchUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+                .build()
+
+            client.newCall(searchRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    val html = response.body?.string() ?: ""
+                    
+                    val browseIdRegex = Regex("\"browseId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                    browseIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                    val channelIdRegex = Regex("\"channelId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                    channelIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+                    
+                    val generalChannelUrlRegex = Regex("/channel/(UC[a-zA-Z0-9_-]{22})")
+                    generalChannelUrlRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
