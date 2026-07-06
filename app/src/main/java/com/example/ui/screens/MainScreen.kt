@@ -228,7 +228,8 @@ fun MainScreen(
                         channel = selectedChannel!!,
                         videosState = videosState,
                         onBackClick = { viewModel.navigateToChannels() },
-                        onVideoClick = { viewModel.playVideo(it) }
+                        onVideoClick = { viewModel.playVideo(it) },
+                        onRefresh = { viewModel.loadVideos(selectedChannel!!.channelId) }
                     )
                     
                     ScreenState.PLAYER -> VideoPlayerScreen(
@@ -462,7 +463,8 @@ fun ChannelVideosScreen(
     channel: ApprovedChannel,
     videosState: VideosUiState,
     onBackClick: () -> Unit,
-    onVideoClick: (YoutubeVideo) -> Unit
+    onVideoClick: (YoutubeVideo) -> Unit,
+    onRefresh: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
@@ -546,6 +548,21 @@ fun ChannelVideosScreen(
                     .weight(1f)
                     .testTag("channel_video_search_input")
             )
+
+            // Manual Refresh Button next to search field
+            IconButton(
+                onClick = { onRefresh() },
+                modifier = Modifier
+                    .background(CardBg, RoundedCornerShape(12.dp))
+                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                    .testTag("refresh_channel_videos_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Refresh, 
+                    contentDescription = "רענן",
+                    tint = RoyalBlue
+                )
+            }
         }
 
         // Live Feed Videos List
@@ -589,6 +606,16 @@ fun ChannelVideosScreen(
                             textAlign = TextAlign.Center,
                             fontSize = 14.sp
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { onRefresh() },
+                            colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(imageVector = Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("נסה לטעון מחדש", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -735,6 +762,8 @@ fun VideoPlayerScreen(
     video: YoutubeVideo,
     onBackClick: () -> Unit
 ) {
+    var useAlternativePlayer by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -750,6 +779,7 @@ fun VideoPlayerScreen(
         ) {
             KosherVideoPlayer(
                 videoId = video.id,
+                useAlternativePlayer = useAlternativePlayer,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -834,6 +864,47 @@ fun VideoPlayerScreen(
                 }
             }
 
+            // Toggle for Alternative Player in case of play issues
+            Card(
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                border = BorderStroke(1.dp, BorderColor),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "מצב נגן חלופי (פרוטוקול עוקף חסימות)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = DarkText
+                        )
+                        Text(
+                            text = "הפעל אם הוידאו מציג שגיאת טעינה או אינו מתנגן",
+                            fontSize = 10.sp,
+                            color = MutedText
+                        )
+                    }
+                    Switch(
+                        checked = useAlternativePlayer,
+                        onCheckedChange = { useAlternativePlayer = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = RoyalBlue,
+                            uncheckedThumbColor = MutedText,
+                            uncheckedTrackColor = LightBlue
+                        ),
+                        modifier = Modifier.testTag("alternative_player_switch")
+                    )
+                }
+            }
+
             // Control Button: Back to list of videos
             Button(
                 onClick = onBackClick,
@@ -897,7 +968,11 @@ private fun Context.findActivity(): Activity? {
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
+fun KosherVideoPlayer(
+    videoId: String, 
+    useAlternativePlayer: Boolean = false,
+    modifier: Modifier = Modifier
+) {
     var isFullScreen by remember { mutableStateOf(false) }
     var customViewRef by remember { mutableStateOf<View?>(null) }
     var customCallbackRef by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
@@ -919,7 +994,7 @@ fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
         }
     }
 
-    key(videoId) {
+    key(videoId, useAlternativePlayer) {
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
@@ -992,6 +1067,7 @@ fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
                         }
                     }
                     
+                    val playerDomain = if (useAlternativePlayer) "https://www.youtube.com" else "https://www.youtube-nocookie.com"
                     val html = """
                         <!DOCTYPE html>
                         <html>
@@ -1016,7 +1092,7 @@ fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
                         <body>
                             <iframe 
                                 id="player"
-                                src="https://www.youtube-nocookie.com/embed/$videoId?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&showinfo=0&iv_load_policy=3&disablekb=0"
+                                src="$playerDomain/embed/$videoId?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&showinfo=0&iv_load_policy=3&disablekb=0"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                                 allowfullscreen>
                             </iframe>
@@ -1024,7 +1100,7 @@ fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
                         </html>
                     """.trimIndent()
                     
-                    loadDataWithBaseURL("https://www.youtube-nocookie.com", html, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL(playerDomain, html, "text/html", "UTF-8", null)
                 }
             },
             modifier = modifier

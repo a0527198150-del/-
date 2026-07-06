@@ -19,14 +19,145 @@ class YoutubeRssService {
 
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("Unexpected HTTP code $response")
-                val bodyString = response.body?.string() ?: ""
-                return@withContext YoutubeRssParser.parseFeed(bodyString)
+                if (response.isSuccessful) {
+                    val bodyString = response.body?.string() ?: ""
+                    val parsed = YoutubeRssParser.parseFeed(bodyString)
+                    if (parsed.isNotEmpty()) {
+                        return@withContext parsed
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            return@withContext emptyList()
         }
+
+        // Redundant Fallback: Scraping standard YouTube channel videos page (handles RSS failures/rate-limits)
+        try {
+            val htmlUrl = "https://www.youtube.com/channel/$channelId/videos"
+            val htmlRequest = Request.Builder()
+                .url(htmlUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+                .build()
+
+            client.newCall(htmlRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    val htmlString = response.body?.string() ?: ""
+                    val scrapedVideos = extractVideosFromHtml(htmlString, channelId)
+                    if (scrapedVideos.isNotEmpty()) {
+                        return@withContext scrapedVideos
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // Secondary fallback: Scrape main channel home page
+        try {
+            val htmlUrl = "https://www.youtube.com/channel/$channelId"
+            val htmlRequest = Request.Builder()
+                .url(htmlUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+                .build()
+
+            client.newCall(htmlRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    val htmlString = response.body?.string() ?: ""
+                    val scrapedVideos = extractVideosFromHtml(htmlString, channelId)
+                    if (scrapedVideos.isNotEmpty()) {
+                        return@withContext scrapedVideos
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return@withContext emptyList()
+    }
+
+    private fun extractVideosFromHtml(html: String, channelId: String): List<YoutubeVideo> {
+        val videos = mutableListOf<YoutubeVideo>()
+        try {
+            // Find "videoRenderer" structures in raw html/ytInitialData JSON
+            val videoRendererRegex = Regex("\"videoRenderer\"\\s*:\\s*\\{([\\s\\S]*?)\\}")
+            val matches = videoRendererRegex.findAll(html)
+            
+            val ogTitleRegex = Regex("<meta\\s+property=\"og:title\"\\s+content=\"([^\"]+)\"")
+            var channelName = ogTitleRegex.find(html)?.groupValues?.get(1) ?: "ערוץ יוטיוב"
+            if (channelName.endsWith(" - YouTube")) {
+                channelName = channelName.removeSuffix(" - YouTube")
+            }
+
+            for (match in matches) {
+                val content = match.groupValues[1]
+                
+                // Extract videoId
+                val videoIdRegex = Regex("\"videoId\"\\s*:\\s*\"([a-zA-Z0-9_-]{11})\"")
+                val videoId = videoIdRegex.find(content)?.groupValues?.get(1) ?: continue
+                
+                // Extract title
+                val titleTextRegex = Regex("\"title\"\\s*:\\s*\\{\\s*\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([^\"]+)\"")
+                var title = titleTextRegex.find(content)?.groupValues?.get(1) ?: ""
+                if (title.isEmpty()) {
+                    val simpleTextRegex = Regex("\"title\"\\s*:\\s*\\{\\s*\"simpleText\"\\s*:\\s*\"([^\"]+)\"")
+                    title = simpleTextRegex.find(content)?.groupValues?.get(1) ?: ""
+                }
+                if (title.isEmpty()) {
+                    val labelRegex = Regex("\"label\"\\s*:\\s*\"([^\"]+)\"")
+                    title = labelRegex.find(content)?.groupValues?.get(1) ?: "שיעור וידאו"
+                }
+                title = decodeUnicode(title)
+
+                // Extract thumbnail URL
+                val thumbRegex = Regex("\"url\"\\s*:\\s*\"(https://i\\.ytimg\\.com/[^\"]+)\"")
+                val thumbnailUrl = thumbRegex.find(content)?.groupValues?.get(1)?.replace("\\/", "/") 
+                    ?: "https://img.youtube.com/vi/$videoId/0.jpg"
+
+                // Extract published time text and description snippet
+                val publishedRegex = Regex("\"publishedTimeText\"\\s*:\\s*\\{\\s*\"simpleText\"\\s*:\\s*\"([^\"]+)\"")
+                val publishedAt = publishedRegex.find(content)?.groupValues?.get(1)?.let { decodeUnicode(it) } ?: "שיעור"
+
+                val descRegex = Regex("\"descriptionSnippet\"\\s*:\\s*\\{\\s*\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([^\"]+)\"")
+                val description = descRegex.find(content)?.groupValues?.get(1)?.let { decodeUnicode(it) } ?: ""
+
+                if (videos.none { it.id == videoId }) {
+                    videos.add(
+                        YoutubeVideo(
+                            id = videoId,
+                            title = title,
+                            channelId = channelId,
+                            channelName = channelName,
+                            thumbnailUrl = thumbnailUrl,
+                            description = description,
+                            publishedAt = publishedAt
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return videos
+    }
+
+    private fun decodeUnicode(input: String): String {
+        var str = input
+        try {
+            val regex = Regex("\\\\u([0-9a-fA-F]{4})")
+            var match = regex.find(str)
+            while (match != null) {
+                val hex = match.groupValues[1]
+                val char = hex.toInt(16).toChar()
+                str = str.replace(match.value, char.toString())
+                match = regex.find(str)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return str
     }
 
     suspend fun resolveChannelId(input: String): String? = withContext(Dispatchers.IO) {
