@@ -37,18 +37,18 @@ object YoutubeRssParser {
                             currentPublished = ""
                         } else if (inEntry) {
                             when (name) {
-                                "yt:videoId" -> currentVideoId = parser.nextText()
-                                "yt:channelId" -> currentChannelId = parser.nextText()
+                                "yt:videoId", "videoId" -> currentVideoId = parser.nextText()
+                                "yt:channelId", "channelId" -> currentChannelId = parser.nextText()
                                 "title" -> currentTitle = parser.nextText()
                                 "published" -> currentPublished = parser.nextText()
                                 "name" -> currentChannelName = parser.nextText()
-                                "media:thumbnail" -> {
+                                "media:thumbnail", "thumbnail" -> {
                                     val url = parser.getAttributeValue(null, "url")
                                     if (!url.isNullOrBlank()) {
                                         currentThumbnailUrl = url
                                     }
                                 }
-                                "media:description" -> currentDescription = parser.nextText()
+                                "media:description", "description" -> currentDescription = parser.nextText()
                             }
                         }
                     }
@@ -89,12 +89,12 @@ object YoutubeRssParser {
         try {
             // Segment xml entry strings
             val entryRegex = Regex("<entry>([\\s\\S]*?)</entry>")
-            val videoIdRegex = Regex("<yt:videoId>([^<]+)</yt:videoId>")
+            val videoIdRegex = Regex("<(?:yt:)?videoId>([^<]+)</(?:yt:)?videoId>")
             val titleRegex = Regex("<title>([^<]+)</title>")
-            val channelIdRegex = Regex("<yt:channelId>([^<]+)</yt:channelId>")
+            val channelIdRegex = Regex("<(?:yt:)?channelId>([^<]+)</(?:yt:)?channelId>")
             val channelNameRegex = Regex("<name>([^<]+)</name>")
-            val thumbnailRegex = Regex("<media:thumbnail[^>]+url=\"([^\"]+)\"")
-            val descriptionRegex = Regex("<media:description>([^<]*)</media:description>")
+            val thumbnailRegex = Regex("<(?:media:)?thumbnail[^>]+url=\"([^\"]+)\"")
+            val descriptionRegex = Regex("<(?:media:)?description>([^<]*)</(?:media:)?description>")
             val publishedRegex = Regex("<published>([^<]+)</published>")
 
             entryRegex.findAll(xmlString).forEach { matchResult ->

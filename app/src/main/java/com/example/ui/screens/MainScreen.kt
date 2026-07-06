@@ -16,11 +16,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -263,93 +265,58 @@ fun ChannelsGridScreen(
     onChannelClick: (ApprovedChannel) -> Unit,
     onEnterSupervisorClick: () -> Unit
 ) {
-    var isBannerDismissed by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Kosher Header Card with modern Gold-themed colors
-        if (!isBannerDismissed) {
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = GoldBg),
-                border = BorderStroke(1.5.dp, GoldBorder),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp)
-            ) {
+        // Beautiful Hero Banner Image
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(130.dp)
+                .padding(bottom = 12.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Image(
+                    painter = painterResource(id = com.example.R.drawable.img_hero_banner),
+                    contentDescription = "ערוצים כשרים - סביבת לימוד מוגנת",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                // Dark elegant overlay gradient for modern polish
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                            )
+                        )
+                )
+                // Banner text
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.Bottom,
+                    horizontalAlignment = Alignment.Start
                 ) {
                     Text(
-                        text = "הלימוד היומי שלך בערוצים כשרים",
+                        text = "ערוצים כשרים לשיעורי תורה",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = GoldColor,
-                        textAlign = TextAlign.Center
+                        fontSize = 18.sp,
+                        color = Color.White
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "הגישה באפליקציה זו מוגבלת אך ורק לערוצי התורה והחיזוק שאושרו בפיקוח. שאר התכנים ברשת חסומים בצורה מוחלטת.",
-                        fontSize = 13.sp,
-                        color = DarkText.copy(alpha = 0.9f),
-                        textAlign = TextAlign.Center,
-                        lineHeight = 18.sp
+                        text = "סביבת צפייה מוגנת, מבוקרת ומסוננת לחלוטין",
+                        fontSize = 11.sp,
+                        color = GoldColor,
+                        fontWeight = FontWeight.Medium
                     )
-                    
-                    if (!isSupervisorMode) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "לשינוי או הוספת ערוצים, פנה למשגיח או לחץ על סמל המנעול למעלה.",
-                            fontSize = 12.sp,
-                            color = MutedText,
-                            textAlign = TextAlign.Center
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(RoyalBlue.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                .border(1.dp, RoyalBlue, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "מצב מפקח פעיל! באפשרותך להוסיף ולמחוק ערוצים כעת.",
-                                fontSize = 12.sp,
-                                color = DarkText,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    
-                    Button(
-                        onClick = { isBannerDismissed = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = RoyalBlue),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .testTag("dismiss_banner_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "הבנתי, המשך לערוצים",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
                 }
             }
         }
@@ -404,10 +371,8 @@ fun ChannelsGridScreen(
                 }
             }
         } else {
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 160.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 items(channels) { channel ->
@@ -427,88 +392,64 @@ fun ChannelGridItem(
     onClick: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = CardBg),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         border = BorderStroke(1.dp, BorderColor),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
             .testTag("channel_card_${channel.channelId}")
     ) {
-        Column(
+        Row(
             modifier = Modifier
-                .padding(16.dp)
+                .padding(10.dp)
                 .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Elegant circle with channel initial letter (school/study theme)
+            // Sleek mini play circle icon instead of large initials circle
             Box(
                 modifier = Modifier
-                    .size(60.dp)
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(LightBlue)
-                    .border(1.dp, BorderColor, RoundedCornerShape(30.dp)),
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(RoyalBlue.copy(alpha = 0.15f))
+                    .border(1.dp, RoyalBlue.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = channel.customName.take(1),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = GoldColor
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            Text(
-                text = channel.customName,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = DarkText,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(4.dp))
-            
-            Text(
-                text = channel.description.ifBlank { "ערוץ מאושר ומסונן" },
-                fontSize = 11.sp,
-                color = MutedText,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 14.sp,
-                modifier = Modifier.height(28.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(14.dp))
-            
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(RoyalBlue.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                    .border(1.dp, RoyalBlue.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-                    .padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
                 Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = "צפייה",
-                    tint = RoyalBlue,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "צפה בשיעורים",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RoyalBlue
+                    imageVector = Icons.Filled.PlayCircle,
+                    contentDescription = null,
+                    tint = GoldColor,
+                    modifier = Modifier.size(20.dp)
                 )
             }
+            
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = channel.customName,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = DarkText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = channel.description.ifBlank { "ערוץ שנבחר ומאושר לצפייה מסוננת" },
+                    fontSize = 11.sp,
+                    color = MutedText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "פתח ערוץ",
+                tint = RoyalBlue,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
@@ -967,6 +908,7 @@ fun KosherVideoPlayer(videoId: String, modifier: Modifier = Modifier) {
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
+                    setLayerType(View.LAYER_TYPE_HARDWARE, null)
                     settings.javaScriptEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
                     settings.domStorageEnabled = true

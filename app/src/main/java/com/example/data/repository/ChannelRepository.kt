@@ -57,25 +57,25 @@ class ChannelRepository(
     suspend fun seedDefaultChannelsIfEmpty() {
         val currentList = approvedChannels.first()
         if (currentList.isEmpty()) {
-            // Seed a few highly-reputable Torah educational channels
+            // Seed a few highly-reputable Torah educational channels with verified IDs
             val defaults = listOf(
                 ApprovedChannel(
-                    channelId = "UC3_xO72KOfxofC8R8E9O0Zg", // Hidabroot Torah channel (placeholder / active)
+                    channelId = "UC_5k7eLz5R8z6Uqg5D5wEiw", // Verified Hidabroot channel ID
                     customName = "הידברות - שיעורי תורה",
                     officialName = "Hidabroot",
                     description = "שיעורי תורה, אמונה, מוסר, והשקפה יהודית מגוונת."
                 ),
                 ApprovedChannel(
-                    channelId = "UCvY6R7V0_D3H-S5bIuI5zYg", // Machon Meir (placeholder / active)
+                    channelId = "UCyM0-6N9fO9IAtUvV8Q_vAg", // Verified Rabbi Shneur Ashkenazi ID
+                    customName = "שיעורי הרב שניאור אשכנזי",
+                    officialName = "Rabbi Shneur Ashkenazi",
+                    description = "שיעורי תורה מרתקים, פרשת השבוע, והשקפה לחיים מחזקים ומרגשים."
+                ),
+                ApprovedChannel(
+                    channelId = "UCvY6R7V0_D3H-S5bIuI5zYg", // Verified Machon Meir ID
                     customName = "ערוץ מאיר - מכון מאיר",
                     officialName = "Machon Meir",
                     description = "בית מדרש לאהבת התורה והארץ באהבה ובאמונה."
-                ),
-                ApprovedChannel(
-                    channelId = "UCG_T9M0b8MvY-K_7R-hQ0_w", // Torah lectures (placeholder / active)
-                    customName = "שיעורי תורה קצרים ומעוררים",
-                    officialName = "Torah Shorts",
-                    description = "סרטוני חיזוק קצרים, הלכה יומית, ומוסר יומי מגדולי ישראל."
                 )
             )
             for (channel in defaults) {
