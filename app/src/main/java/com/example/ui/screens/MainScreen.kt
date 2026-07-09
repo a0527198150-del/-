@@ -11,6 +11,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -1006,6 +1008,16 @@ fun KosherVideoPlayer(
                     settings.useWideViewPort = true
                     settings.databaseEnabled = true
                     settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+                    // Prevent Android's dark-mode "algorithmic darkening" from painting
+                    // the nested YouTube <video> element black. It only affects the
+                    // visual layer, so audio keeps playing while the video looks black.
+                    // We can't add a color-scheme meta tag to fix this because the
+                    // video lives inside YouTube's own iframe document, which we don't
+                    // control - so it must be disabled here, at the WebView level.
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                        WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                    }
                     
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(
