@@ -772,7 +772,6 @@ fun VideoPlayerScreen(
             .background(ScreenBg)
     ) {
         // Immersive full-bleed 16:9 Video Player at the top
-        // Rendered flat directly without a clipping rounded Card to prevent the black screen composition bug!
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -791,7 +790,8 @@ fun VideoPlayerScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(14.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Elegant title and channel row
@@ -843,9 +843,7 @@ fun VideoPlayerScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = CardBg),
                 border = BorderStroke(1.dp, BorderColor),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
@@ -928,7 +926,7 @@ fun VideoPlayerScreen(
                 Text("חזרה לרשימת השיעורים", color = RoyalBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Safety badge footer
             Row(
@@ -1000,7 +998,9 @@ fun KosherVideoPlayer(
         AndroidView(
             factory = { ctx ->
                 WebView(ctx).apply {
-                    setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                    // ביטול שכבת החומרה הידנית שחסמה את הוידאו
+                    setLayerType(View.LAYER_TYPE_NONE, null)
+                    
                     settings.javaScriptEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
                     settings.domStorageEnabled = true
@@ -1009,14 +1009,12 @@ fun KosherVideoPlayer(
                     settings.databaseEnabled = true
                     settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-                    // Prevent Android's dark-mode "algorithmic darkening" from painting
-                    // the nested YouTube <video> element black. It only affects the
-                    // visual layer, so audio keeps playing while the video looks black.
-                    // We can't add a color-scheme meta tag to fix this because the
-                    // video lives inside YouTube's own iframe document, which we don't
-                    // control - so it must be disabled here, at the WebView level.
+                    // הגנה מפני מנגנוני מצב כהה של המערכת (הסיבה למסך השחור)
                     if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
                         WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                    }
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                        WebSettingsCompat.setForceDark(settings, WebSettingsCompat.FORCE_DARK_OFF)
                     }
                     
                     webViewClient = object : WebViewClient() {
