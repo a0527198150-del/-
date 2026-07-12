@@ -1003,7 +1003,13 @@ fun KosherVideoPlayer(
             factory = { ctx ->
                 WebView(ctx).apply {
                     // ביטול שכבת החומרה הידנית שחסמה את הוידאו
-                    setLayerType(View.LAYER_TYPE_NONE, null)
+                    // LAYER_TYPE_SOFTWARE forces the WebView (including the nested
+                    // YouTube <video> element) to render through normal View drawing
+                    // instead of its own hardware-composited overlay surface. This
+                    // avoids a known Z-order/attachment conflict between Compose's
+                    // AndroidView interop and WebView's hardware surface, which is
+                    // what caused the black screen + zero touch response.
+                    setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                     
                     settings.javaScriptEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
