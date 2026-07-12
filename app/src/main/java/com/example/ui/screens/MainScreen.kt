@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -1033,9 +1035,33 @@ fun KosherVideoPlayer(
                             }
                             return false
                         }
+
+                        override fun onReceivedError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            error: WebResourceError?
+                        ) {
+                            super.onReceivedError(view, request, error)
+                            if (request?.isForMainFrame == true) {
+                                Toast.makeText(
+                                    ctx,
+                                    "שגיאת טעינה: ${error?.errorCode} ${error?.description}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
                     }
 
                     webChromeClient = object : WebChromeClient() {
+                        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                            val msg = consoleMessage?.message() ?: ""
+                            // Only surface real errors, to avoid flooding the screen with noise
+                            if (consoleMessage?.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                                Toast.makeText(ctx, "JS error: $msg", Toast.LENGTH_LONG).show()
+                            }
+                            return true
+                        }
+
                         override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                             super.onShowCustomView(view, callback)
                             val activity = ctx.findActivity() ?: return
