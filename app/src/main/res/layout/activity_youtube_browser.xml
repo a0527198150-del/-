@@ -2,20 +2,20 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@android:color/black">
 
-    <!-- ה-WebView הראשי שמציג את הסרטון -->
-    <WebView
+    <!-- הדפדפן הראשי שבו הגולש מדפדף -->
+    <android.webkit.WebView
         android:id="@+id/webView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- קונטיינר זמני שיופיע רק במצב מסך מלא של הסרטון -->
+    <!-- אזור ייעודי שיופעל ויוצג רק כאשר נכנסים למצב מסך מלא -->
     <FrameLayout
-        android:id="@+id/customViewContainer"
+        android:id="@+id/fullscreenContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#000000"
+        android:background="@android:color/black"
         android:visibility="gone" />
 
 </FrameLayout>
