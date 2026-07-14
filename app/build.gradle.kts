@@ -10,9 +10,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example"
-    compileSdk = 36
-
+    namespace 'com.example.youtubebrowser'
+    compileSdk 34
+    // ... שאר ההגדרות שלך
+}
     defaultConfig {
         applicationId = "com.aistudio.kosherchannels.yfqbzw2"
         minSdk = 24
