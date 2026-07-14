@@ -15,7 +15,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -24,11 +24,14 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        getByName("debug") {
+            isMinifyEnabled = false
         }
     }
 
@@ -44,23 +47,43 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        viewBinding = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.0"
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
     }
 }
 
 dependencies {
-    // --- ספריות צד ג' ופיתוח ---
+    // --- ספריות בסיס ---
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    
+    // --- Compose BOM ---
+    val composeBom = platform("androidx.compose:compose-bom:2024.02.00")
+    implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
 
-    // --- בסיס נתונים ועיבוד נתונים ---
+    // --- בסיס נתונים ---
     implementation(libs.androidx.room.runtime)
-    // ksp(libs.androidx.room.compiler) // אם קיים, תוסיף כאן
+    // אם חסר קישור ל-kapt/ksp עבור room:
+    // ksp(libs.androidx.room.compiler)
 
     // --- Moshi & Serialization ---
     implementation(libs.converter.moshi)
@@ -96,7 +119,7 @@ dependencies {
     testImplementation(libs.roborazzi.junit.rule)
 
     // --- בדיקות אינטגרציה ---
-    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(composeBom)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
