@@ -146,5 +146,5 @@ dependencies {
     androidTestImplementation(libs.androidx.runner)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
-    add("ksp", libs.moshi.kotlin.codegen)
+    ksp("com.squareup.moshi:moshi-kotlin-codegen:1.15.0")
 }
