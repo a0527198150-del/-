@@ -1,123 +1,268 @@
 package com.example.data.network
 
-import com.example.BuildConfig
-import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.moshi.MoshiConverterFactory
+import okhttp3.Request
+import java.io.IOException
 
-/**
- * Fetches channel videos and resolves channel IDs using the official
- * YouTube Data API v3 (https://developers.google.com/youtube/v3).
- *
- * The class name is kept as "YoutubeRssService" on purpose so that
- * ChannelRepository.kt does not need to change at all.
- */
 class YoutubeRssService {
-
-    private val apiKey: String = BuildConfig.YOUTUBE_API_KEY
-
-    private val okHttpClient = OkHttpClient.Builder()
-        .addInterceptor(
-            HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BASIC
-            }
-        )
-        .build()
-
-    private val moshi: Moshi = Moshi.Builder().build()
-
-    private val retrofit = Retrofit.Builder()
-        .baseUrl(YoutubeApiService.BASE_URL)
-        .client(okHttpClient)
-        .addConverterFactory(MoshiConverterFactory.create(moshi))
-        .build()
-
-    private val api: YoutubeApiService = retrofit.create(YoutubeApiService::class.java)
-
-    private fun hasValidKey(): Boolean =
-        apiKey.isNotBlank() && apiKey != "MY_YOUTUBE_API_KEY"
+    private val client = OkHttpClient()
 
     suspend fun fetchChannelVideos(channelId: String): List<YoutubeVideo> = withContext(Dispatchers.IO) {
-        if (!hasValidKey()) return@withContext emptyList()
+        val apiKey = com.example.BuildConfig.YOUTUBE_API_KEY
+        if (apiKey.isNotBlank() && apiKey != "YOUTUBE_API_KEY" && !apiKey.startsWith("MY_")) {
+            val apiVideos = fetchVideosUsingYoutubeApi(channelId, apiKey)
+            if (apiVideos != null && apiVideos.isNotEmpty()) {
+                return@withContext apiVideos
+            }
+        }
+
+        val url = "https://www.youtube.com/feeds/videos.xml?channel_id=$channelId"
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+            .build()
 
         try {
-            // Every channel's "uploads" playlist ID is the channel ID with
-            // the "UC" prefix replaced by "UU" - this saves an extra API call
-            // to channels.list just to look up contentDetails.
-            val uploadsPlaylistId = if (channelId.startsWith("UC")) {
-                "UU" + channelId.removePrefix("UC")
-            } else {
-                channelId
-            }
-
-            val playlistResponse = api.getPlaylistItems(
-                playlistId = uploadsPlaylistId,
-                apiKey = apiKey
-            )
-
-            playlistResponse.items.mapNotNull { item ->
-                val snippet = item.snippet ?: return@mapNotNull null
-                val videoId = snippet.resourceId?.videoId ?: return@mapNotNull null
-                YoutubeVideo(
-                    id = videoId,
-                    title = snippet.title ?: "",
-                    channelId = channelId,
-                    channelName = snippet.channelTitle ?: "",
-                    thumbnailUrl = snippet.thumbnails?.high?.url
-                        ?: snippet.thumbnails?.medium?.url
-                        ?: snippet.thumbnails?.default?.url
-                        ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
-                    description = snippet.description ?: "",
-                    publishedAt = snippet.publishedAt ?: ""
-                )
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bodyString = response.body?.string() ?: ""
+                    val parsed = YoutubeRssParser.parseFeed(bodyString)
+                    if (parsed.isNotEmpty()) {
+                        return@withContext parsed
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            emptyList()
         }
+
+        // Redundant Fallback: Scraping standard YouTube channel videos page (handles RSS failures/rate-limits)
+        try {
+            val htmlUrl = "https://www.youtube.com/channel/$channelId/videos"
+            val htmlRequest = Request.Builder()
+                .url(htmlUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+                .build()
+
+            client.newCall(htmlRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    val htmlString = response.body?.string() ?: ""
+                    val scrapedVideos = extractVideosFromHtml(htmlString, channelId)
+                    if (scrapedVideos.isNotEmpty()) {
+                        return@withContext scrapedVideos
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // Secondary fallback: Scrape main channel home page
+        try {
+            val htmlUrl = "https://www.youtube.com/channel/$channelId"
+            val htmlRequest = Request.Builder()
+                .url(htmlUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+                .build()
+
+            client.newCall(htmlRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    val htmlString = response.body?.string() ?: ""
+                    val scrapedVideos = extractVideosFromHtml(htmlString, channelId)
+                    if (scrapedVideos.isNotEmpty()) {
+                        return@withContext scrapedVideos
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return@withContext emptyList()
+    }
+
+    private fun extractVideosFromHtml(html: String, channelId: String): List<YoutubeVideo> {
+        val videos = mutableListOf<YoutubeVideo>()
+        try {
+            // Find "videoRenderer" structures in raw html/ytInitialData JSON
+            val videoRendererRegex = Regex("\"videoRenderer\"\\s*:\\s*\\{([\\s\\S]*?)\\}")
+            val matches = videoRendererRegex.findAll(html)
+            
+            val ogTitleRegex = Regex("<meta\\s+property=\"og:title\"\\s+content=\"([^\"]+)\"")
+            var channelName = ogTitleRegex.find(html)?.groupValues?.get(1) ?: "ערוץ יוטיוב"
+            if (channelName.endsWith(" - YouTube")) {
+                channelName = channelName.removeSuffix(" - YouTube")
+            }
+
+            for (match in matches) {
+                val content = match.groupValues[1]
+                
+                // Extract videoId
+                val videoIdRegex = Regex("\"videoId\"\\s*:\\s*\"([a-zA-Z0-9_-]{11})\"")
+                val videoId = videoIdRegex.find(content)?.groupValues?.get(1) ?: continue
+                
+                // Extract title
+                val titleTextRegex = Regex("\"title\"\\s*:\\s*\\{\\s*\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([^\"]+)\"")
+                var title = titleTextRegex.find(content)?.groupValues?.get(1) ?: ""
+                if (title.isEmpty()) {
+                    val simpleTextRegex = Regex("\"title\"\\s*:\\s*\\{\\s*\"simpleText\"\\s*:\\s*\"([^\"]+)\"")
+                    title = simpleTextRegex.find(content)?.groupValues?.get(1) ?: ""
+                }
+                if (title.isEmpty()) {
+                    val labelRegex = Regex("\"label\"\\s*:\\s*\"([^\"]+)\"")
+                    title = labelRegex.find(content)?.groupValues?.get(1) ?: "שיעור וידאו"
+                }
+                title = decodeUnicode(title)
+
+                // Extract thumbnail URL
+                val thumbRegex = Regex("\"url\"\\s*:\\s*\"(https://i\\.ytimg\\.com/[^\"]+)\"")
+                val thumbnailUrl = thumbRegex.find(content)?.groupValues?.get(1)?.replace("\\/", "/") 
+                    ?: "https://img.youtube.com/vi/$videoId/0.jpg"
+
+                // Extract published time text and description snippet
+                val publishedRegex = Regex("\"publishedTimeText\"\\s*:\\s*\\{\\s*\"simpleText\"\\s*:\\s*\"([^\"]+)\"")
+                val publishedAt = publishedRegex.find(content)?.groupValues?.get(1)?.let { decodeUnicode(it) } ?: "שיעור"
+
+                val descRegex = Regex("\"descriptionSnippet\"\\s*:\\s*\\{\\s*\"runs\"\\s*:\\s*\\[\\s*\\{\\s*\"text\"\\s*:\\s*\"([^\"]+)\"")
+                val description = descRegex.find(content)?.groupValues?.get(1)?.let { decodeUnicode(it) } ?: ""
+
+                if (videos.none { it.id == videoId }) {
+                    videos.add(
+                        YoutubeVideo(
+                            id = videoId,
+                            title = title,
+                            channelId = channelId,
+                            channelName = channelName,
+                            thumbnailUrl = thumbnailUrl,
+                            description = description,
+                            publishedAt = publishedAt
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return videos
+    }
+
+    private fun decodeUnicode(input: String): String {
+        var str = input
+        try {
+            val regex = Regex("\\\\u([0-9a-fA-F]{4})")
+            var match = regex.find(str)
+            while (match != null) {
+                val hex = match.groupValues[1]
+                val char = hex.toInt(16).toChar()
+                str = str.replace(match.value, char.toString())
+                match = regex.find(str)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return str
     }
 
     suspend fun resolveChannelId(input: String): String? = withContext(Dispatchers.IO) {
+        val apiKey = com.example.BuildConfig.YOUTUBE_API_KEY
+        if (apiKey.isNotBlank() && apiKey != "YOUTUBE_API_KEY" && !apiKey.startsWith("MY_")) {
+            val apiChannelId = resolveChannelIdUsingApi(input, apiKey)
+            if (apiChannelId != null) {
+                return@withContext apiChannelId
+            }
+        }
+
         val trimmed = input.trim()
 
-        // 1. Already a channel ID
+        // 1. If it's already a UC ID
         if (trimmed.startsWith("UC") && trimmed.length == 24) {
             return@withContext trimmed
         }
 
-        // 2. A full channel URL that already contains the UC id
+        // 2. If it's a channel URL with UC ID in it
         val channelIdPattern = Regex("youtube\\.com/channel/(UC[a-zA-Z0-9_-]{22})")
-        channelIdPattern.find(trimmed)?.groupValues?.get(1)?.let { return@withContext it }
+        val match = channelIdPattern.find(trimmed)
+        if (match != null) {
+            return@withContext match.groupValues[1]
+        }
 
-        if (!hasValidKey()) return@withContext null
+        // 3. Reconstruct the full YouTube URL
+        val targetUrl = when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.startsWith("@") -> "https://www.youtube.com/$trimmed"
+            else -> "https://www.youtube.com/@$trimmed"
+        }
 
-        // 3. Resolve a handle (e.g. @SomeChannel, a bare username, or a
-        //    youtube.com/@SomeChannel URL) via channels.list?forHandle=
+        val request = Request.Builder()
+            .url(targetUrl)
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+            .build()
+
         try {
-            val handleFromUrl = Regex("youtube\\.com/(@[\\w.-]+)").find(trimmed)?.groupValues?.get(1)
-            val candidateHandle = when {
-                handleFromUrl != null -> handleFromUrl
-                trimmed.startsWith("@") -> trimmed
-                trimmed.startsWith("http://") || trimmed.startsWith("https://") -> null
-                else -> "@$trimmed"
-            }
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val html = response.body?.string() ?: ""
 
-            if (candidateHandle != null) {
-                val handleResponse = api.getChannelByHandle(handle = candidateHandle, apiKey = apiKey)
-                handleResponse.items.firstOrNull()?.id?.let { return@withContext it }
+                // A. itemprop="channelId" content="UC..."
+                val itempropRegex = Regex("itemprop=\"channelId\"\\s+content=\"(UC[a-zA-Z0-9_-]{22})\"")
+                itempropRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                val itempropRegex2 = Regex("content=\"(UC[a-zA-Z0-9_-]{22})\"\\s+itemprop=\"channelId\"")
+                itempropRegex2.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                // B. canonical link: href="https://www.youtube.com/channel/UC..."
+                val canonicalRegex = Regex("<link\\s+rel=\"canonical\"\\s+href=\"https://www.youtube.com/channel/(UC[a-zA-Z0-9_-]{22})\"")
+                canonicalRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                // C. browseId or channelId in JSON structures
+                val browseIdRegex = Regex("\"browseId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                browseIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                val jsonChannelIdRegex = Regex("\"channelId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                jsonChannelIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                val externalIdRegex = Regex("\"externalId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                externalIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                // D. General fallback for any channel link inside the page
+                val generalChannelUrlRegex = Regex("/channel/(UC[a-zA-Z0-9_-]{22})")
+                generalChannelUrlRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        // 4. Last resort: search YouTube for a channel matching the text
+        // 4. Fallback: Search YouTube with "channel" filters if it's a plain search query
         try {
-            val searchResponse = api.searchChannel(query = trimmed, apiKey = apiKey)
-            searchResponse.items.firstOrNull()?.id?.channelId?.let { return@withContext it }
+            val encodedQuery = java.net.URLEncoder.encode(trimmed, "UTF-8")
+            // sp=EgIQAg%253D%253D triggers the "Channel" filter on YouTube search
+            val searchUrl = "https://www.youtube.com/results?search_query=$encodedQuery&sp=EgIQAg%253D%253D"
+            val searchRequest = Request.Builder()
+                .url(searchUrl)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept-Language", "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7")
+                .build()
+
+            client.newCall(searchRequest).execute().use { response ->
+                if (response.isSuccessful) {
+                    val html = response.body?.string() ?: ""
+                    
+                    val browseIdRegex = Regex("\"browseId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                    browseIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+
+                    val channelIdRegex = Regex("\"channelId\"\\s*:\\s*\"(UC[a-zA-Z0-9_-]{22})\"")
+                    channelIdRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+                    
+                    val generalChannelUrlRegex = Regex("/channel/(UC[a-zA-Z0-9_-]{22})")
+                    generalChannelUrlRegex.find(html)?.groupValues?.get(1)?.let { return@withContext it }
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -125,18 +270,211 @@ class YoutubeRssService {
         return@withContext null
     }
 
+    private suspend fun fetchVideosUsingYoutubeApi(channelId: String, apiKey: String): List<YoutubeVideo>? {
+        // Try playlistItems first (uploads playlist is UU... instead of UC...)
+        if (channelId.startsWith("UC") && channelId.length == 24) {
+            val uploadsPlaylistId = "UU" + channelId.substring(2)
+            try {
+                val url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=30&playlistId=$uploadsPlaylistId&key=$apiKey"
+                val request = Request.Builder().url(url).build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val responseBody = response.body?.string() ?: ""
+                        val videos = parsePlaylistItemsJson(responseBody, channelId)
+                        if (videos.isNotEmpty()) {
+                            return videos
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // Fallback to search API if playlistItems failed or isn't a standard UC ID
+        try {
+            val url = "https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=30&channelId=$channelId&order=date&type=video&key=$apiKey"
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: ""
+                    val videos = parseSearchJson(responseBody, channelId)
+                    if (videos.isNotEmpty()) {
+                        return videos
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return null
+    }
+
+    private fun parsePlaylistItemsJson(jsonStr: String, channelId: String): List<YoutubeVideo> {
+        val videos = mutableListOf<YoutubeVideo>()
+        try {
+            val root = org.json.JSONObject(jsonStr)
+            val items = root.optJSONArray("items") ?: return emptyList()
+            for (i in 0 until items.length()) {
+                val item = items.optJSONObject(i) ?: continue
+                val snippet = item.optJSONObject("snippet") ?: continue
+                val resourceId = snippet.optJSONObject("resourceId") ?: continue
+                val videoId = resourceId.optString("videoId") ?: continue
+                val title = snippet.optString("title", "שיעור תורה")
+                val description = snippet.optString("description", "")
+                val channelTitle = snippet.optString("channelTitle", "ערוץ תורה")
+                
+                val thumbnails = snippet.optJSONObject("thumbnails")
+                val highThumb = thumbnails?.optJSONObject("high") ?: thumbnails?.optJSONObject("medium") ?: thumbnails?.optJSONObject("default")
+                val thumbnailUrl = highThumb?.optString("url") ?: "https://img.youtube.com/vi/$videoId/0.jpg"
+                
+                val publishedAt = formatApiPublishedAt(snippet.optString("publishedAt", ""))
+
+                videos.add(
+                    YoutubeVideo(
+                        id = videoId,
+                        title = title,
+                        channelId = channelId,
+                        channelName = channelTitle,
+                        thumbnailUrl = thumbnailUrl,
+                        description = description,
+                        publishedAt = publishedAt
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return videos
+    }
+
+    private fun parseSearchJson(jsonStr: String, channelId: String): List<YoutubeVideo> {
+        val videos = mutableListOf<YoutubeVideo>()
+        try {
+            val root = org.json.JSONObject(jsonStr)
+            val items = root.optJSONArray("items") ?: return emptyList()
+            for (i in 0 until items.length()) {
+                val item = items.optJSONObject(i) ?: continue
+                val idObj = item.optJSONObject("id") ?: continue
+                val videoId = idObj.optString("videoId") ?: continue
+                val snippet = item.optJSONObject("snippet") ?: continue
+                val title = snippet.optString("title", "שיעור תורה")
+                val description = snippet.optString("description", "")
+                val channelTitle = snippet.optString("channelTitle", "ערוץ תורה")
+                
+                val thumbnails = snippet.optJSONObject("thumbnails")
+                val highThumb = thumbnails?.optJSONObject("high") ?: thumbnails?.optJSONObject("medium") ?: thumbnails?.optJSONObject("default")
+                val thumbnailUrl = highThumb?.optString("url") ?: "https://img.youtube.com/vi/$videoId/0.jpg"
+                
+                val publishedAt = formatApiPublishedAt(snippet.optString("publishedAt", ""))
+
+                videos.add(
+                    YoutubeVideo(
+                        id = videoId,
+                        title = title,
+                        channelId = channelId,
+                        channelName = channelTitle,
+                        thumbnailUrl = thumbnailUrl,
+                        description = description,
+                        publishedAt = publishedAt
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return videos
+    }
+
+    private fun formatApiPublishedAt(rawDate: String): String {
+        if (rawDate.length >= 10) {
+            val parts = rawDate.substring(0, 10).split("-")
+            if (parts.size == 3) {
+                return "${parts[2]}/${parts[1]}/${parts[0]}"
+            }
+        }
+        return "שיעור"
+    }
+
+    private suspend fun resolveChannelIdUsingApi(input: String, apiKey: String): String? {
+        val trimmed = input.trim()
+
+        if (trimmed.startsWith("UC") && trimmed.length == 24) {
+            return trimmed
+        }
+
+        val handle = when {
+            trimmed.contains("youtube.com/@") -> {
+                "@" + trimmed.substringAfter("youtube.com/@").substringBefore("/").substringBefore("?")
+            }
+            trimmed.startsWith("@") -> trimmed
+            trimmed.startsWith("http") -> null
+            else -> null
+        }
+
+        if (handle != null) {
+            try {
+                val url = "https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=$handle&key=$apiKey"
+                val request = Request.Builder().url(url).build()
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val responseBody = response.body?.string() ?: ""
+                        val root = org.json.JSONObject(responseBody)
+                        val items = root.optJSONArray("items")
+                        if (items != null && items.length() > 0) {
+                            return items.getJSONObject(0).optString("id")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        try {
+            val encodedQuery = java.net.URLEncoder.encode(trimmed, "UTF-8")
+            val url = "https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=1&q=$encodedQuery&key=$apiKey"
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val responseBody = response.body?.string() ?: ""
+                    val root = org.json.JSONObject(responseBody)
+                    val items = root.optJSONArray("items")
+                    if (items != null && items.length() > 0) {
+                        val idObj = items.getJSONObject(0).optJSONObject("id")
+                        val channelId = idObj?.optString("channelId")
+                        if (!channelId.isNullOrEmpty()) {
+                            return channelId
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return null
+    }
+
     companion object {
-        // Safe channel ID parsing (kept for compatibility, unused internally now)
+        // Safe channel ID parsing
         fun extractChannelId(input: String): String? {
             val trimmed = input.trim()
             if (trimmed.startsWith("UC") && trimmed.length == 24) {
                 return trimmed
             }
+            
+            // Matches youtube.com/channel/UCxxxxxxxxxxxxxxxxx
             val channelIdPattern = Regex("youtube\\.com/channel/(UC[a-zA-Z0-9_-]{22})")
             val match = channelIdPattern.find(trimmed)
             if (match != null) {
                 return match.groupValues[1]
             }
+
+            // Matches youtube.com/c/xxx or youtube.com/@username
+            // Note: RSS feed only supports UC... format, so we can display instructions 
+            // on how to find the UC... channel ID if they put a username.
             return null
         }
     }

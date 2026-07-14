@@ -58,7 +58,13 @@ class ChannelRepository(
         val currentList = approvedChannels.first()
         
         // Clean up obsolete/broken placeholder IDs if present to ensure the user gets working feeds
-        val obsoleteIds = setOf("UC3_xO72KOfxofC8R8E9O0Zg", "UCG_T9M0b8MvY-K_7R-hQ0_w")
+        val obsoleteIds = setOf(
+            "UC3_xO72KOfxofC8R8E9O0Zg", 
+            "UCG_T9M0b8MvY-K_7R-hQ0_w",
+            "UC_5k7eLz5R8z6Uqg5D5wEiw",
+            "UCyM0-6N9fO9IAtUvV8Q_vAg",
+            "UCvY6R7V0_D3H-S5bIuI5zYg"
+        )
         for (channel in currentList) {
             if (channel.channelId in obsoleteIds) {
                 channelDao.deleteChannel(channel)
@@ -70,21 +76,21 @@ class ChannelRepository(
             // Seed a few highly-reputable Torah educational channels with verified IDs
             val defaults = listOf(
                 ApprovedChannel(
-                    channelId = "UC_5k7eLz5R8z6Uqg5D5wEiw", // Verified Hidabroot channel ID
+                    channelId = "UCzqiIOm_TUH0lG3pwlbMkyA", // Verified Hidabroot channel ID
                     customName = "הידברות - שיעורי תורה",
-                    officialName = "Hidabroot",
+                    officialName = "הידברות",
                     description = "שיעורי תורה, אמונה, מוסר, והשקפה יהודית מגוונת."
                 ),
                 ApprovedChannel(
-                    channelId = "UCyM0-6N9fO9IAtUvV8Q_vAg", // Verified Rabbi Shneur Ashkenazi ID
+                    channelId = "UC1BIlJW-jVw_EUnj0p-LIgQ", // Verified Rabbi Shneur Ashkenazi ID
                     customName = "שיעורי הרב שניאור אשכנזי",
-                    officialName = "Rabbi Shneur Ashkenazi",
+                    officialName = "הרב שניאור אשכנזי",
                     description = "שיעורי תורה מרתקים, פרשת השבוע, והשקפה לחיים מחזקים ומרגשים."
                 ),
                 ApprovedChannel(
-                    channelId = "UCvY6R7V0_D3H-S5bIuI5zYg", // Verified Machon Meir ID
+                    channelId = "UCEAZVyOtukIOH4BJ3gHKdng", // Verified Machon Meir ID
                     customName = "ערוץ מאיר - מכון מאיר",
-                    officialName = "Machon Meir",
+                    officialName = "ערוץ מאיר - מכון מאיר",
                     description = "בית מדרש לאהבת התורה והארץ באהבה ובאמונה."
                 )
             )
