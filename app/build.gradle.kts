@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.app" // וודא שזה תואם לשם החבילה שלך
+    namespace = "com.example.app" 
     compileSdk = 34
 
     defaultConfig {
@@ -28,7 +28,6 @@ android {
 }
 
 dependencies {
-    // ספריות בסיס ואנדרואיד
     implementation(libs.androidx.room.runtime)
     implementation(libs.coil.compose)
     implementation(libs.converter.moshi)
@@ -43,10 +42,8 @@ dependencies {
     implementation(libs.androidx.webkit)
     implementation("androidx.appcompat:appcompat:1.6.1")
 
-    // הגדרת ה-KSP בצורה בטוחה
     ksp(libs.moshi.kotlin.codegen)
 
-    // ספריות בדיקה
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core)
     testImplementation(libs.androidx.junit)
@@ -56,14 +53,12 @@ dependencies {
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
 
-    // בדיקות UI
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.runner)
 
-    // ספריות פיתוח
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
