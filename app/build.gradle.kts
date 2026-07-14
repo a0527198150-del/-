@@ -1,51 +1,50 @@
 plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android' // תמיכה בקוטלין
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
-    // מומלץ להשתמש בגרסה 34 ומעלה כדי לתמוך באנדרואיד 13/14 ומעלה בצורה מושלמת
-    compileSdk 34 
+    namespace = "com.example.youtubebrowser"
+    compileSdk = 34
 
     defaultConfig {
-        applicationId "com.example.youtubebrowser" // שים לב! שנה את זה לשם החבילה האמיתי שלך
-        minSdk 24 // תמיכה במכשירים החל מאנדרואיד 7 ומעלה
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        applicationId = "com.example.youtubebrowser"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
-    
+
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
-    
+
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = "1.8"
     }
 }
 
 dependencies {
-    // ספריות בסיס של אנדרואיד
-    implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.webkit:webkit:1.11.0")
 
-    // ה-Dependency הקריטי ביותר עבור ה-WebView המודרני
-    implementation 'androidx.webkit:webkit:1.11.0'
-
-    // ספריות בדיקה (אופציונלי)
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
