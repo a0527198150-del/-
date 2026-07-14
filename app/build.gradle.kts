@@ -126,6 +126,9 @@ dependencies {
     // ספריית ה-WebView הנדרשת עבור הדפדפן הפנימי
     implementation(libs.androidx.webkit)
     
+    // ספריית appcompat הנדרשת עבור ה-AppCompatActivity (פותרת את השגיאה בבנייה!)
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.androidx.core)
     testImplementation(libs.androidx.junit)
