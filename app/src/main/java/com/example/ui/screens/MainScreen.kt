@@ -6,11 +6,15 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -22,6 +26,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -51,13 +57,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import android.content.pm.ActivityInfo
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.YouTubePlayer
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.PlayerConstants
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.AbstractYouTubePlayerListener
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.options.IFramePlayerOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.data.database.ApprovedChannel
@@ -777,7 +776,6 @@ fun VideoPlayerScreen(
             .background(ScreenBg)
     ) {
         // Immersive full-bleed 16:9 Video Player at the top
-        // Rendered flat directly without a clipping rounded Card to prevent the black screen composition bug!
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -796,7 +794,8 @@ fun VideoPlayerScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(14.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Elegant title and channel row
@@ -848,9 +847,7 @@ fun VideoPlayerScreen(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = CardBg),
                 border = BorderStroke(1.dp, BorderColor),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
@@ -933,7 +930,7 @@ fun VideoPlayerScreen(
                 Text("חזרה לרשימת השיעורים", color = RoyalBlue, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Safety badge footer
             Row(
@@ -973,6 +970,7 @@ private fun Context.findActivity(): Activity? {
     return null
 }
 
+@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun KosherVideoPlayer(
     videoId: String, 
@@ -981,91 +979,173 @@ fun KosherVideoPlayer(
 ) {
     var isFullScreen by remember { mutableStateOf(false) }
     var customViewRef by remember { mutableStateOf<View?>(null) }
-    var customExitRef by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var customCallbackRef by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val activity = context.findActivity()
 
     if (isFullScreen) {
         BackHandler {
-            customExitRef?.invoke()
+            val activity = context.findActivity()
+            val customViewLocal = customViewRef
+            if (activity != null && customViewLocal != null) {
+                (activity.window.decorView as ViewGroup).removeView(customViewLocal)
+                customViewRef = null
+                customCallbackRef?.onCustomViewHidden()
+                customCallbackRef = null
+                activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                isFullScreen = false
+            }
         }
     }
 
-    key(videoId) {
-        var playerViewRef by remember { mutableStateOf<YouTubePlayerView?>(null) }
-
-        DisposableEffect(lifecycleOwner, playerViewRef) {
-            val pView = playerViewRef
-            if (pView != null) {
-                lifecycleOwner.lifecycle.addObserver(pView)
-            }
-            onDispose {
-                if (pView != null) {
-                    lifecycleOwner.lifecycle.removeObserver(pView)
-                    pView.release()
-                }
-                customExitRef?.invoke()
-            }
-        }
-
+    key(videoId, useAlternativePlayer) {
         AndroidView(
             factory = { ctx ->
-                YouTubePlayerView(ctx).apply {
-                    val options = IFramePlayerOptions.Builder()
-                        .controls(1) // Native YouTube controls
-                        .autoplay(1)
-                        .rel(0)
-                        .build()
+                WebView(ctx).apply {
+                    // ביטול שכבת החומרה הידנית שחסמה את הוידאו
+                    // LAYER_TYPE_SOFTWARE forces the WebView (including the nested
+                    // YouTube <video> element) to render through normal View drawing
+                    // instead of its own hardware-composited overlay surface. This
+                    // avoids a known Z-order/attachment conflict between Compose's
+                    // AndroidView interop and WebView's hardware surface, which is
+                    // what caused the black screen + zero touch response.
+                    setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    
+                    settings.javaScriptEnabled = true
+                    settings.mediaPlaybackRequiresUserGesture = false
+                    settings.domStorageEnabled = true
+                    settings.loadWithOverviewMode = true
+                    settings.useWideViewPort = true
+                    settings.databaseEnabled = true
+                    settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 
-                    initialize(object : AbstractYouTubePlayerListener() {
-                        override fun onReady(youTubePlayer: YouTubePlayer) {
-                            youTubePlayer.loadVideo(videoId, 0f)
+                    // הגנה מפני מנגנוני מצב כהה של המערכת (הסיבה למסך השחור)
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                        WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                    }
+                    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                        WebSettingsCompat.setForceDark(settings, WebSettingsCompat.FORCE_DARK_OFF)
+                    }
+                    
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val url = request?.url?.toString() ?: ""
+                            val isMainFrame = request?.isForMainFrame ?: false
+                            if (isMainFrame) {
+                                return if (url.contains("youtube.com/embed/") || url.contains("youtube-nocookie.com/embed/")) {
+                                    false
+                                } else {
+                                    true
+                                }
+                            }
+                            return false
                         }
-                    }, options)
 
-                    addFullscreenListener(object : com.pierfrancescosoffritti.androidyoutubeplayer.core.player.listeners.FullscreenListener {
-                        override fun onEnterFullscreen(fullscreenView: View, exitFullscreen: () -> Unit) {
+                        override fun onReceivedError(
+                            view: WebView?,
+                            request: WebResourceRequest?,
+                            error: WebResourceError?
+                        ) {
+                            super.onReceivedError(view, request, error)
+                            if (request?.isForMainFrame == true) {
+                                Toast.makeText(
+                                    ctx,
+                                    "שגיאת טעינה: ${error?.errorCode} ${error?.description}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                            val msg = consoleMessage?.message() ?: ""
+                            // Only surface real errors, to avoid flooding the screen with noise
+                            if (consoleMessage?.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+                                Toast.makeText(ctx, "JS error: $msg", Toast.LENGTH_LONG).show()
+                            }
+                            return true
+                        }
+
+                        override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                            super.onShowCustomView(view, callback)
+                            val activity = ctx.findActivity() ?: return
+                            if (customViewRef != null) {
+                                callback?.onCustomViewHidden()
+                                return
+                            }
+                            customViewRef = view
+                            customCallbackRef = callback
                             isFullScreen = true
-                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                            activity?.window?.decorView?.systemUiVisibility = (
+                            
+                            activity.window.decorView.systemUiVisibility = (
                                 View.SYSTEM_UI_FLAG_FULLSCREEN or
                                 View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
                                 View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                             )
                             
-                            (fullscreenView.parent as? ViewGroup)?.removeView(fullscreenView)
-                            (activity?.window?.decorView as? ViewGroup)?.addView(
-                                fullscreenView,
+                            (activity.window.decorView as ViewGroup).addView(
+                                view,
                                 ViewGroup.LayoutParams(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
                             )
-                            customViewRef = fullscreenView
-                            customExitRef = exitFullscreen
                         }
 
-                        override fun onExitFullscreen() {
-                            isFullScreen = false
-                            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            activity?.window?.decorView?.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                        override fun onHideCustomView() {
+                            super.onHideCustomView()
+                            val activity = ctx.findActivity() ?: return
+                            val customViewLocal = customViewRef ?: return
                             
-                            val cv = customViewRef
-                            if (cv != null) {
-                                (activity?.window?.decorView as? ViewGroup)?.removeView(cv)
-                                customViewRef = null
-                            }
-                            customExitRef = null
+                            (activity.window.decorView as ViewGroup).removeView(customViewLocal)
+                            customViewRef = null
+                            customCallbackRef?.onCustomViewHidden()
+                            customCallbackRef = null
+                            isFullScreen = false
+                            
+                            activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
                         }
-                    })
-
-                    playerViewRef = this
+                    }
+                    
+                    val playerDomain = if (useAlternativePlayer) "https://www.youtube.com" else "https://www.youtube-nocookie.com"
+                    val html = """
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+                            <style>
+                                body, html {
+                                    margin: 0;
+                                    padding: 0;
+                                    width: 100%;
+                                    height: 100%;
+                                    background-color: #0A0B10;
+                                    overflow: hidden;
+                                }
+                                iframe {
+                                    width: 100%;
+                                    height: 100%;
+                                    border: none;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <iframe 
+                                id="player"
+                                src="$playerDomain/embed/$videoId?autoplay=1&controls=1&modestbranding=1&rel=0&fs=1&showinfo=0&iv_load_policy=3&disablekb=0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowfullscreen>
+                            </iframe>
+                        </body>
+                        </html>
+                    """.trimIndent()
+                    
+                    loadDataWithBaseURL(playerDomain, html, "text/html", "UTF-8", null)
                 }
-            },
-            update = { playerView ->
-                // Recreated on videoId change
             },
             modifier = modifier
         )
@@ -1445,3 +1525,4 @@ fun PinPromptDialog(
         }
     }
 }
+ 
