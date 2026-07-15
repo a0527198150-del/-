@@ -1,4 +1,8 @@
-name: Build Android APK
+- name: Fix Gradle Wrapper JAR
+  run: |
+    mkdir -p gradle/wrapper
+    curl -L -o gradle/wrapper/gradle-wrapper.jar \
+      "https://github.com/gradle/gradle/raw/refs/heads/main/gradle/wrapper/gradle-wrapper.jar"name: Build Android APK
 
 on:
   push:
