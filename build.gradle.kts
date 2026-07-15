@@ -1,9 +1,72 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-plugins {
-  alias(libs.plugins.android.application) apply false
-  alias(libs.plugins.kotlin.compose) apply false
-  alias(libs.plugins.google.devtools.ksp) apply false
-  alias(libs.plugins.roborazzi) apply false
-  alias(libs.plugins.secrets) apply false
-  alias(libs.plugins.google.services) apply false
-}
+name: Build Android APK
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '9.3.1'
+    - name: Decode debug keystore
+      run: |
+        if [ -f debug.keystore.base64 ]; then
+          tr -d '\n\r' < debug.keystore.base64 | base64 -d > debug.keystore
+        elif [ -f app/debug.keystore.base64 ]; then
+          tr -d '\n\r' < app/debug.keystore.base64 | base64 -d > debug.keystore
+        fi
+        
+        if [ ! -s debug.keystore ]; then
+          echo "Debug keystore not found or invalid, generating a new one..."
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+        fi
+    - name: Create .env file
+      run: |
+        echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
+        echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> .env
+    - name: Build with Gradle
+      run: gradle assembleDebug
+    - name: Rename APK for release
+      if: startsWith(github.ref, 'refs/tags/')
+      run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/KosherChannels-${{ github.ref_name }}.apk
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kosher-channels-apk
+        path: app/build/outputs/apk/debug/app-debug.apk
+    - name: Create GitHub Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: app/build/outputs/apk/debug/KosherChannels-${{ github.ref_name }}.apk
+        name: "ערוצים כשרים ${{ github.ref_name }}"
+        body: |
+          גרסה כשרה ומאובטחת חדשה לאפליקציית **ערוצים כשרים** (לשעבר סינון קודש).
+          
+          ### מה חדש בגרסה זו?
+          * 📺 **תמיכה בנגן מסך מלא:** מעתה ניתן לצפות בשיעורים ובסרטונים במסך מלא בצורה חלקה ונוחה!
+          * 🔍 **חיפוש בתוך הערוץ:** נוספה שורת חיפוש מהירה לחיפוש שיעורים ונושאים בתוך הערוץ המבוקש.
+          * 🎨 **ממשק משתמש משודרג:** עיצוב מודרני, כהה ויוקרתי (Ultra-sleek dark space) עם דגשים מוזהבים ונוחות משופרת.
+          * 💬 **כפתור "הבנתי" לבאנר המידע:** באנר המידע בחלק העליון ניתן להסתרה בלחיצת כפתור קלה כדי לפנות מקום לערוצים.
+          * 🏷️ **שם חדש ומזמין:** האפליקציה שונתה רשמית מ-"סינון קודש" ל-**"ערוצים כשרים"**.
+          
+          להורדה, התקינו את קובץ ה-APK המצורף למטה.
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
