@@ -21,7 +21,20 @@ jobs:
 
       - name: Create debug keystore
         run: |
-          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Create .env file
+        run: |
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY || 'placeholder' }}" > .env
+          echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY || '' }}" >> .env
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -30,3 +43,10 @@ jobs:
 
       - name: Build with Gradle (Debug)
         run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
