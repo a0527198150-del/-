@@ -22,12 +22,16 @@ jobs:
       - name: Cache Gradle packages
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
+          path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+
+      - name: Download Gradle 9.3.1
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /tmp/
+          echo "/tmp/gradle-9.3.1/bin" >> $GITHUB_PATH
 
       - name: Create debug keystore
         run: |
@@ -46,11 +50,8 @@ jobs:
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY || 'placeholder' }}" > .env
           echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY || '' }}" >> .env
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build with Gradle (Debug)
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Build Debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
