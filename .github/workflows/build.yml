@@ -33,6 +33,20 @@ jobs:
           unzip -q /tmp/gradle.zip -d /tmp/
           echo "/tmp/gradle-9.3.1/bin" >> $GITHUB_PATH
 
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Create .env file
+        run: |
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY || 'placeholder' }}" > .env
+          echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY || '' }}" >> .env
+
+      - name: Create .env.example file
+        run: |
+          echo "GEMINI_API_KEY=placeholder" > .env.example
+          echo "YOUTUBE_API_KEY=" >> .env.example
+
       - name: Create debug keystore
         run: |
           keytool -genkeypair -v \
@@ -45,13 +59,8 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Create .env file
-        run: |
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY || 'placeholder' }}" > .env
-          echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY || '' }}" >> .env
-
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build_output.txt; exit ${PIPESTATUS[0]}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -59,3 +68,10 @@ jobs:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Upload build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build_output.txt
