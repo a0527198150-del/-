@@ -99,4 +99,5 @@ google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDev
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secretsGradlePlugin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices"
-webkit = "1.13.0" }
+webkit = "1.13.0"
+androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
