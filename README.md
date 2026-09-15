@@ -1,21 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# ערוצים כשרים — Kosher Channels
 
-# Run and deploy your AI Studio app
+אפליקציית אנדרואיד לצפייה מסוננת בערוצי יוטיוב מאושרים בלבד, עם מצב מפקח מוגן בקוד.
 
-This contains everything you need to run your app locally.
+## מה יש באפליקציה
 
-View your app in AI Studio: https://ai.studio/apps/b23d8955-d443-49d8-86fb-c6d8779b93f4
+- **נגן וידאו נייטיב** מבוסס [`android-youtube-player`](https://github.com/PierfrancescoSoffritti/android-youtube-player)
+  (IFrame Player מנוהל, מואץ חומרה) במקום WebView ידני. ממשק הנגן של יוטיוב מכובה לחלוטין
+  (`controls=0`), וכל הפקדים מצוירים ב-Compose — ולכן אין גישה לחיפוש, לתגובות, להמלצות או
+  למעבר לאפליקציית יוטיוב.
+- פקדים מלאים: ניגון/השהיה, ‎±10 שניות, סרגל התקדמות, מהירות ניגון, מסך מלא עם סיבוב אוטומטי,
+  שמירת מיקום צפייה והמשך מאיפה שהפסקת.
+- **מסך בית** עם "המשך צפייה", רצועת ערוצים ופיד השיעורים האחרונים מכל הערוצים המאושרים.
+- חיפוש פנימי — רק בתוך התוכן שאושר.
+- **מצב מפקח** מוגן בקוד PIN: הוספה והסרה של ערוצים (לפי קישור, ‎@שם משתמש או מזהה UC),
+  ניהול מפתח ה-API, שינוי קוד גישה וניקוי היסטוריה.
 
-## Run Locally
+## מפתח YouTube API
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+המפתח **אינו** מוטמע בקוד. בהפעלה הראשונה האפליקציה מבקשת אותו, מאמתת אותו מול Google
+ושומרת אותו במכשיר בלבד (DataStore). אפשר להחליף או להסיר אותו בכל רגע דרך מצב מפקח.
 
+ללא מפתח האפליקציה עדיין עובדת דרך פיד ה-RSS הציבורי של יוטיוב, אך מציגה פחות סרטונים
+וללא משך זמן ותמונות ערוץ.
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+כדי להשיג מפתח: Google Cloud Console → פרויקט חדש → הפעלת **YouTube Data API v3** →
+Credentials → API key.
+
+## הרצה מקומית
+
+**דרישות:** [Android Studio](https://developer.android.com/studio)
+
+1. פתח את התיקייה ב-Android Studio ואפשר לו לסנכרן את הפרויקט.
+2. צור קובץ `.env` בשורש הפרויקט על בסיס `.env.example`.
+3. הרץ על אמולטור או מכשיר.
+
+## מבנה הקוד
+
+```
+data/database    Room: ערוצים מאושרים והגדרות המפקח
+data/settings    DataStore: מפתח API, העדפות ניגון, היסטוריית צפייה
+data/network     גישה ליוטיוב: Data API v3, ואחריו RSS ו-scraping כגיבוי
+data/repository  שכבת הלוגיקה שמחברת בין המסד, ההגדרות והרשת
+ui/player        עטיפת Compose לנגן הנייטיב + מצב הנגן
+ui/components    רכיבי UI משותפים (כרטיסים, shimmer, מצבי ריק)
+ui/screens       מסכים: אונבורדינג, בית, ערוץ, נגן, מפקח
+ui/theme         מערכת העיצוב (צבעים, טיפוגרפיה, צורות, RTL)
+```

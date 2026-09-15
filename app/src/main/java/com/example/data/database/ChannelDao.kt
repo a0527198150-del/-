@@ -12,6 +12,9 @@ interface ChannelDao {
     @Query("SELECT * FROM approved_channels ORDER BY addedAt DESC")
     fun getAllApprovedChannels(): Flow<List<ApprovedChannel>>
 
+    @Query("SELECT * FROM approved_channels WHERE channelId = :channelId LIMIT 1")
+    suspend fun findChannel(channelId: String): ApprovedChannel?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChannel(channel: ApprovedChannel)
 
