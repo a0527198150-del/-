@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Inflated from Compose. Declaring the view in XML is the only way to switch
+  off automatic initialization, which we need so the player can be created with
+  our own IFrame options (no web UI, no related videos, no YouTube branding).
+-->
+<com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/kosher_youtube_player"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    app:autoPlay="false"
+    app:enableAutomaticInitialization="false"
+    app:handleNetworkEvents="true" />

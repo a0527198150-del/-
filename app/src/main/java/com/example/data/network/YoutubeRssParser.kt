@@ -4,136 +4,139 @@ import android.util.Xml
 import org.xmlpull.v1.XmlPullParser
 import java.io.StringReader
 
+/**
+ * Parses the public `feeds/videos.xml` channel feed. Used as the fallback when
+ * no YouTube Data API key is configured, or when the API call fails.
+ */
 object YoutubeRssParser {
+
     fun parseFeed(xmlString: String): List<YoutubeVideo> {
-        val videos = mutableListOf<YoutubeVideo>()
-        try {
-            val parser = Xml.newPullParser()
-            parser.setInput(StringReader(xmlString))
-            var eventType = parser.eventType
-            
-            var currentVideoId = ""
-            var currentTitle = ""
-            var currentChannelId = ""
-            var currentChannelName = ""
-            var currentThumbnailUrl = ""
-            var currentDescription = ""
-            var currentPublished = ""
-            
-            var inEntry = false
-            
-            while (eventType != XmlPullParser.END_DOCUMENT) {
-                val name = parser.name
-                when (eventType) {
-                    XmlPullParser.START_TAG -> {
-                        if (name == "entry") {
-                            inEntry = true
-                            currentVideoId = ""
-                            currentTitle = ""
-                            currentChannelId = ""
-                            currentChannelName = ""
-                            currentThumbnailUrl = ""
-                            currentDescription = ""
-                            currentPublished = ""
-                        } else if (inEntry) {
-                            when (name) {
-                                "yt:videoId", "videoId" -> currentVideoId = parser.nextText()
-                                "yt:channelId", "channelId" -> currentChannelId = parser.nextText()
-                                "title" -> currentTitle = parser.nextText()
-                                "published" -> currentPublished = parser.nextText()
-                                "name" -> currentChannelName = parser.nextText()
-                                "media:thumbnail", "thumbnail" -> {
-                                    val url = parser.getAttributeValue(null, "url")
-                                    if (!url.isNullOrBlank()) {
-                                        currentThumbnailUrl = url
-                                    }
-                                }
-                                "media:description", "description" -> currentDescription = parser.nextText()
-                            }
-                        }
-                    }
-                    XmlPullParser.END_TAG -> {
-                        if (name == "entry") {
-                            inEntry = false
-                            if (currentVideoId.isNotEmpty()) {
-                                if (currentThumbnailUrl.isEmpty()) {
-                                    currentThumbnailUrl = "https://i.ytimg.com/vi/$currentVideoId/hqdefault.jpg"
-                                }
-                                videos.add(
-                                    YoutubeVideo(
-                                        id = currentVideoId,
-                                        title = currentTitle,
-                                        channelId = currentChannelId,
-                                        channelName = currentChannelName,
-                                        thumbnailUrl = currentThumbnailUrl,
-                                        description = currentDescription,
-                                        publishedAt = currentPublished
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-                eventType = parser.next()
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            // Fallback: Use regex parser on failure to ensure reliable parsing
-            return parseFeedWithRegex(xmlString)
+        val parsed = try {
+            parseWithPullParser(xmlString)
+        } catch (error: Exception) {
+            emptyList()
         }
-        return if (videos.isEmpty()) parseFeedWithRegex(xmlString) else videos
+        return parsed.ifEmpty { parseWithRegex(xmlString) }
     }
 
-    private fun parseFeedWithRegex(xmlString: String): List<YoutubeVideo> {
+    private fun parseWithPullParser(xmlString: String): List<YoutubeVideo> {
         val videos = mutableListOf<YoutubeVideo>()
-        try {
-            // Segment xml entry strings
-            val entryRegex = Regex("<entry>([\\s\\S]*?)</entry>")
-            val videoIdRegex = Regex("<(?:yt:)?videoId>([^<]+)</(?:yt:)?videoId>")
-            val titleRegex = Regex("<title>([^<]+)</title>")
-            val channelIdRegex = Regex("<(?:yt:)?channelId>([^<]+)</(?:yt:)?channelId>")
-            val channelNameRegex = Regex("<name>([^<]+)</name>")
-            val thumbnailRegex = Regex("<(?:media:)?thumbnail[^>]+url=\"([^\"]+)\"")
-            val descriptionRegex = Regex("<(?:media:)?description>([^<]*)</(?:media:)?description>")
-            val publishedRegex = Regex("<published>([^<]+)</published>")
+        val parser = Xml.newPullParser()
+        parser.setInput(StringReader(xmlString))
 
-            entryRegex.findAll(xmlString).forEach { matchResult ->
-                val entryContent = matchResult.groupValues[1]
-                val videoId = videoIdRegex.find(entryContent)?.groupValues?.get(1) ?: ""
-                val title = titleRegex.find(entryContent)?.groupValues?.get(1) ?: ""
-                val channelId = channelIdRegex.find(entryContent)?.groupValues?.get(1) ?: ""
-                val channelName = channelNameRegex.find(entryContent)?.groupValues?.get(1) ?: ""
-                val thumbnailUrl = thumbnailRegex.find(entryContent)?.groupValues?.get(1) ?: "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
-                val description = descriptionRegex.find(entryContent)?.groupValues?.get(1) ?: ""
-                val publishedAt = publishedRegex.find(entryContent)?.groupValues?.get(1) ?: ""
+        var videoId = ""
+        var title = ""
+        var channelId = ""
+        var channelName = ""
+        var thumbnailUrl = ""
+        var description = ""
+        var published = ""
+        var inEntry = false
 
-                if (videoId.isNotEmpty()) {
-                    videos.add(
-                        YoutubeVideo(
-                            id = videoId,
-                            title = decodeHtmlEntities(title),
-                            channelId = channelId,
-                            channelName = decodeHtmlEntities(channelName),
-                            thumbnailUrl = thumbnailUrl,
-                            description = decodeHtmlEntities(description),
-                            publishedAt = publishedAt
-                        )
-                    )
+        var eventType = parser.eventType
+        while (eventType != XmlPullParser.END_DOCUMENT) {
+            val name = parser.name
+            when (eventType) {
+                XmlPullParser.START_TAG -> {
+                    if (name == "entry") {
+                        inEntry = true
+                        videoId = ""; title = ""; channelId = ""
+                        channelName = ""; thumbnailUrl = ""; description = ""; published = ""
+                    } else if (inEntry) {
+                        when (name) {
+                            "yt:videoId", "videoId" -> videoId = parser.nextText()
+                            "yt:channelId", "channelId" -> channelId = parser.nextText()
+                            "title" -> title = parser.nextText()
+                            "published" -> published = parser.nextText()
+                            "name" -> channelName = parser.nextText()
+                            "media:thumbnail", "thumbnail" ->
+                                parser.getAttributeValue(null, "url")?.takeIf { it.isNotBlank() }
+                                    ?.let { thumbnailUrl = it }
+                            "media:description", "description" -> description = parser.nextText()
+                        }
+                    }
+                }
+
+                XmlPullParser.END_TAG -> {
+                    if (name == "entry") {
+                        inEntry = false
+                        if (videoId.isNotEmpty()) {
+                            videos.add(
+                                buildVideo(
+                                    videoId, title, channelId, channelName,
+                                    thumbnailUrl, description, published,
+                                )
+                            )
+                        }
+                    }
                 }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
+            eventType = parser.next()
         }
         return videos
     }
 
-    private fun decodeHtmlEntities(text: String): String {
-        return text
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&amp;", "&")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
-            .replace("&#39;", "'")
+    private fun parseWithRegex(xmlString: String): List<YoutubeVideo> {
+        val videos = mutableListOf<YoutubeVideo>()
+        try {
+            for (match in ENTRY.findAll(xmlString)) {
+                val entry = match.groupValues[1]
+                val videoId = VIDEO_ID.find(entry)?.groupValues?.get(1).orEmpty()
+                if (videoId.isEmpty()) continue
+                videos.add(
+                    buildVideo(
+                        videoId = videoId,
+                        title = decodeHtmlEntities(TITLE.find(entry)?.groupValues?.get(1).orEmpty()),
+                        channelId = CHANNEL_ID.find(entry)?.groupValues?.get(1).orEmpty(),
+                        channelName = decodeHtmlEntities(CHANNEL_NAME.find(entry)?.groupValues?.get(1).orEmpty()),
+                        thumbnailUrl = THUMBNAIL.find(entry)?.groupValues?.get(1).orEmpty(),
+                        description = decodeHtmlEntities(DESCRIPTION.find(entry)?.groupValues?.get(1).orEmpty()),
+                        published = PUBLISHED.find(entry)?.groupValues?.get(1).orEmpty(),
+                    )
+                )
+            }
+        } catch (error: Exception) {
+            error.printStackTrace()
+        }
+        return videos
     }
+
+    private fun buildVideo(
+        videoId: String,
+        title: String,
+        channelId: String,
+        channelName: String,
+        thumbnailUrl: String,
+        description: String,
+        published: String,
+    ): YoutubeVideo {
+        val publishedMillis = YoutubeTimeFormat.parseIsoToMillis(published)
+        return YoutubeVideo(
+            id = videoId,
+            title = title,
+            channelId = channelId,
+            channelName = channelName,
+            thumbnailUrl = thumbnailUrl.ifBlank { "https://i.ytimg.com/vi/$videoId/hqdefault.jpg" },
+            description = description,
+            publishedAt = YoutubeTimeFormat.relativeHebrew(publishedMillis),
+            publishedAtMillis = publishedMillis,
+        )
+    }
+
+    private fun decodeHtmlEntities(text: String): String = text
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&#39;", "'")
+        .replace("&amp;", "&")
+
+    private val ENTRY = Regex("<entry>([\\s\\S]*?)</entry>")
+    private val VIDEO_ID = Regex("<(?:yt:)?videoId>([^<]+)</(?:yt:)?videoId>")
+    private val TITLE = Regex("<title>([^<]*)</title>")
+    private val CHANNEL_ID = Regex("<(?:yt:)?channelId>([^<]+)</(?:yt:)?channelId>")
+    private val CHANNEL_NAME = Regex("<name>([^<]*)</name>")
+    private val THUMBNAIL = Regex("<(?:media:)?thumbnail[^>]+url=\"([^\"]+)\"")
+    private val DESCRIPTION = Regex("<(?:media:)?description>([^<]*)</(?:media:)?description>")
+    private val PUBLISHED = Regex("<published>([^<]+)</published>")
 }
